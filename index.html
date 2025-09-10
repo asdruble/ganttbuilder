@@ -38,6 +38,7 @@
         const [periodCount, setPeriodCount] = useState(7);
         const [labelColWidth, setLabelColWidth] = useState(320);
         const [rowHeight, setRowHeight] = useState(56);
+        const [colWidth, setColWidth] = useState(100);
         const [categories, setCategories] = useState(defaultCategories);
         const [rows, setRows] = useState(starterRows);
         const [bgStripes, setBgStripes] = useState(true);
@@ -73,13 +74,41 @@
           return `hsl(${h} 50% 45%)`;
         }
 
+        function applyData(j) {
+          setPeriodPrefix(j.periodPrefix ?? "M");
+          setPeriodStartIndex(j.periodStartIndex ?? 0);
+          setPeriodCount(j.periodCount ?? 6);
+          setLabelColWidth(j.labelColWidth ?? 280);
+          setRowHeight(j.rowHeight ?? 52);
+          setColWidth(j.colWidth ?? 100);
+          setCategories(j.categories ?? defaultCategories);
+          setRows(j.rows ?? []);
+          setBgStripes(Boolean(j.bgStripes));
+        }
+
         function exportJSON() {
-          const data = { periodPrefix, periodStartIndex, periodCount, labelColWidth, rowHeight, categories, rows, bgStripes };
+          const data = { periodPrefix, periodStartIndex, periodCount, labelColWidth, rowHeight, colWidth, categories, rows, bgStripes };
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url; a.download = "timeline.json"; a.click();
           URL.revokeObjectURL(url);
+        }
+
+        function saveLocal() {
+          const data = { periodPrefix, periodStartIndex, periodCount, labelColWidth, rowHeight, colWidth, categories, rows, bgStripes };
+          localStorage.setItem("timeline-builder", JSON.stringify(data));
+        }
+
+        function loadLocal() {
+          const str = localStorage.getItem("timeline-builder");
+          if (!str) return;
+          try {
+            const j = JSON.parse(str);
+            applyData(j);
+          } catch (err) {
+            alert("Invalid saved timeline");
+          }
         }
 
         function importJSON(e) {
@@ -89,14 +118,7 @@
           reader.onload = () => {
             try {
               const j = JSON.parse(String(reader.result));
-              setPeriodPrefix(j.periodPrefix ?? "M");
-              setPeriodStartIndex(j.periodStartIndex ?? 0);
-              setPeriodCount(j.periodCount ?? 6);
-              setLabelColWidth(j.labelColWidth ?? 280);
-              setRowHeight(j.rowHeight ?? 52);
-              setCategories(j.categories ?? defaultCategories);
-              setRows(j.rows ?? []);
-              setBgStripes(Boolean(j.bgStripes));
+              applyData(j);
             } catch (err) {
               alert("Arquivo inválido");
             }
@@ -104,12 +126,18 @@
           reader.readAsText(file);
         }
 
+        useEffect(() => {
+          loadLocal();
+        }, []);
+
         return (
           <div className="w-full min-h-screen bg-neutral-50 text-neutral-900">
-            <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col gap-4">
+            <div className="w-full mx-auto px-4 py-6 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold">Project Timeline (Gantt-style) Builder</h1>
                 <div className="flex gap-2">
+                  <button onClick={saveLocal} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Save</button>
+                  <button onClick={loadLocal} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Load</button>
                   <button onClick={exportJSON} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Export JSON</button>
                   <label className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100 cursor-pointer flex items-center gap-2">
                     <Upload className="w-4 h-4"/>
@@ -139,16 +167,20 @@
                       <label className="text-sm">Label column (px)</label>
                       <input type="number" min={160} max={600} value={labelColWidth} onChange={(e)=>setLabelColWidth(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="text-sm">Row height (px)</label>
-                      <input type="number" min={36} max={120} value={rowHeight} onChange={(e)=>setRowHeight(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input id="bgstripes" type="checkbox" checked={bgStripes} onChange={(e)=>setBgStripes(e.target.checked)} />
-                      <label htmlFor="bgstripes" className="text-sm">Alternate row stripes</label>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-sm">Row height (px)</label>
+                        <input type="number" min={36} max={120} value={rowHeight} onChange={(e)=>setRowHeight(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-sm">Column min width (px)</label>
+                        <input type="number" min={60} max={400} value={colWidth} onChange={(e)=>setColWidth(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input id="bgstripes" type="checkbox" checked={bgStripes} onChange={(e)=>setBgStripes(e.target.checked)} />
+                        <label htmlFor="bgstripes" className="text-sm">Alternate row stripes</label>
+                      </div>
                     </div>
                   </div>
-                </div>
 
                 <div className="p-4 rounded-2xl bg-white shadow md:col-span-2">
                   <h2 className="font-semibold mb-3">Categories</h2>
@@ -185,24 +217,25 @@
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white shadow overflow-x-auto">
-                <div className="min-w-[900px]">
+                <div className="rounded-2xl bg-white shadow overflow-x-auto">
+                  <div className="w-full">
                   <div className="p-3 flex items-center justify-between">
                     <button onClick={()=>addRowAt()} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4"/> Add activity</button>
                     <span className="text-xs text-neutral-500">Arraste para mover/redimensionar. Clique direito para trocar a categoria. <b>Duplo clique</b> no rótulo ou na barra para excluir.</span>
                   </div>
                   <div ref={gridRef} className="px-6 pb-6">
-                    <TimelinePreview
-                      rows={rows}
-                      setRows={setRows}
-                      categories={categories}
-                      labels={periodLabels}
-                      labelColWidth={labelColWidth}
-                      rowHeight={rowHeight}
-                      bgStripes={bgStripes}
-                      onAddRowAt={addRowAt}
-                      onRemoveRow={removeRow}
-                    />
+                      <TimelinePreview
+                        rows={rows}
+                        setRows={setRows}
+                        categories={categories}
+                        labels={periodLabels}
+                        labelColWidth={labelColWidth}
+                        rowHeight={rowHeight}
+                        bgStripes={bgStripes}
+                        onAddRowAt={addRowAt}
+                        onRemoveRow={removeRow}
+                        columnWidth={colWidth}
+                      />
                   </div>
                 </div>
               </div>
@@ -213,9 +246,9 @@
         );
       }
 
-      function TimelinePreview({ rows, setRows, categories, labels, labelColWidth, rowHeight, bgStripes, onAddRowAt, onRemoveRow }) {
-        const cols = labels.length;
-        const gridTemplate = ` ${labelColWidth}px repeat(${cols}, minmax(100px, 1fr))`;
+        function TimelinePreview({ rows, setRows, categories, labels, labelColWidth, rowHeight, bgStripes, onAddRowAt, onRemoveRow, columnWidth }) {
+          const cols = labels.length;
+          const gridTemplate = ` ${labelColWidth}px repeat(${cols}, minmax(${columnWidth}px, 1fr))`;
         const containerRef = useRef(null);
         const [menu, setMenu] = useState({ open:false, x:0, y:0, rowId:null });
         const [drag, setDrag] = useState(null);
