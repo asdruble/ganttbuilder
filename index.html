@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Gantt Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-neutral-50">
+    <div id="root"></div>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel" data-type="module" data-presets="env,react">
+      import React, { useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18";
+      import ReactDOM from "https://esm.sh/react-dom@18/client";
+      import { Plus, Trash2, Upload } from "https://esm.sh/lucide-react@0.276.0";
+
+      // --- Types
+      const defaultCategories = [
+        { id: "discovery", name: "Discovery/Think", color: "#073a4b" },
+        { id: "arquitetura", name: "Arquitetura", color: "#6aa5ab" },
+        { id: "ingestao", name: "Ingestão & QA", color: "#6699a0" },
+        { id: "integracao", name: "Integrações", color: "#4d8b92" },
+        { id: "ativacao", name: "Ativação", color: "#3a7d85" },
+        { id: "handoff", name: "Passagem Conhecimento", color: "#ef7d32" },
+      ];
+
+      const starterRows = [
+        { id: crypto.randomUUID(), name: "Discovery (Think)", category: "discovery", start: 0, end: 1 },
+        { id: crypto.randomUUID(), name: "Arquitetura Lake & AEP", category: "arquitetura", start: 1, end: 3 },
+        { id: crypto.randomUUID(), name: "Ingestão e QA AEP", category: "ingestao", start: 1, end: 3 },
+        { id: crypto.randomUUID(), name: "RTCDP > Salesforce", category: "integracao", start: 1, end: 3 },
+        { id: crypto.randomUUID(), name: "Ativação RTCDP > Salesforce", category: "ativacao", start: 3, end: 5 },
+        { id: crypto.randomUUID(), name: "Passagem de Conhecimento", category: "handoff", start: 4, end: 4 },
+      ];
+
+      function TimelineBuilder() {
+        const [periodPrefix, setPeriodPrefix] = useState("M");
+        const [periodStartIndex, setPeriodStartIndex] = useState(0);
+        const [periodCount, setPeriodCount] = useState(7);
+        const [labelColWidth, setLabelColWidth] = useState(320);
+        const [rowHeight, setRowHeight] = useState(56);
+        const [categories, setCategories] = useState(defaultCategories);
+        const [rows, setRows] = useState(starterRows);
+        const [bgStripes, setBgStripes] = useState(true);
+
+        const gridRef = useRef(null);
+
+        const periodLabels = useMemo(
+          () => Array.from({ length: periodCount }, (_, i) => `${periodPrefix}${i + periodStartIndex}`),
+          [periodPrefix, periodStartIndex, periodCount]
+        );
+
+        function addRowAt(index = rows.length) {
+          setRows((r) => {
+            const base = { id: crypto.randomUUID(), name: `Nova atividade ${r.length + 1}`, category: categories[0].id, start: 0, end: Math.min(1, periodCount - 1) };
+            const copy = [...r];
+            copy.splice(index, 0, base);
+            return copy;
+          });
+        }
+        function removeRow(id) { setRows((r) => r.filter((x) => x.id !== id)); }
+
+        function addCategory() {
+          const id = `cat_${categories.length + 1}`;
+          setCategories((c) => [...c, { id, name: `Categoria ${c.length + 1}`, color: randomColor() }]);
+        }
+        function removeCategory(id) {
+          if (categories.length <= 1) return;
+          setRows((rs) => rs.map((r) => (r.category === id ? { ...r, category: categories[0].id } : r)));
+          setCategories((cs) => cs.filter((c) => c.id !== id));
+        }
+        function randomColor() {
+          const h = Math.floor(Math.random() * 360);
+          return `hsl(${h} 50% 45%)`;
+        }
+
+        function exportJSON() {
+          const data = { periodPrefix, periodStartIndex, periodCount, labelColWidth, rowHeight, categories, rows, bgStripes };
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = "timeline.json"; a.click();
+          URL.revokeObjectURL(url);
+        }
+
+        function importJSON(e) {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const j = JSON.parse(String(reader.result));
+              setPeriodPrefix(j.periodPrefix ?? "M");
+              setPeriodStartIndex(j.periodStartIndex ?? 0);
+              setPeriodCount(j.periodCount ?? 6);
+              setLabelColWidth(j.labelColWidth ?? 280);
+              setRowHeight(j.rowHeight ?? 52);
+              setCategories(j.categories ?? defaultCategories);
+              setRows(j.rows ?? []);
+              setBgStripes(Boolean(j.bgStripes));
+            } catch (err) {
+              alert("Arquivo inválido");
+            }
+          };
+          reader.readAsText(file);
+        }
+
+        return (
+          <div className="w-full min-h-screen bg-neutral-50 text-neutral-900">
+            <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold">Project Timeline (Gantt-style) Builder</h1>
+                <div className="flex gap-2">
+                  <button onClick={exportJSON} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Export JSON</button>
+                  <label className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100 cursor-pointer flex items-center gap-2">
+                    <Upload className="w-4 h-4"/>
+                    Import JSON
+                    <input type="file" accept="application/json" onChange={importJSON} className="hidden" />
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 rounded-2xl bg-white shadow">
+                  <h2 className="font-semibold mb-3">Timeline settings</h2>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm">Periods</label>
+                      <input type="number" min={1} max={36} value={periodCount} onChange={(e)=>setPeriodCount(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm">Prefix</label>
+                      <input value={periodPrefix} onChange={(e)=>setPeriodPrefix(e.target.value)} className="w-28 px-2 py-1 border rounded-lg"/>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm">Start index</label>
+                      <input type="number" value={periodStartIndex} onChange={(e)=>setPeriodStartIndex(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm">Label column (px)</label>
+                      <input type="number" min={160} max={600} value={labelColWidth} onChange={(e)=>setLabelColWidth(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm">Row height (px)</label>
+                      <input type="number" min={36} max={120} value={rowHeight} onChange={(e)=>setRowHeight(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input id="bgstripes" type="checkbox" checked={bgStripes} onChange={(e)=>setBgStripes(e.target.checked)} />
+                      <label htmlFor="bgstripes" className="text-sm">Alternate row stripes</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white shadow md:col-span-2">
+                  <h2 className="font-semibold mb-3">Categories</h2>
+                  <div className="flex flex-wrap gap-2 items-center mb-3">
+                    {categories.map((c) => (
+                      <div key={c.id} className="flex items-center gap-2 bg-neutral-100 rounded-xl px-2 py-1">
+                        <input
+                          className="w-36 px-2 py-1 text-sm border rounded-lg"
+                          value={c.name}
+                          onChange={(e)=>{
+                            const val = e.target.value; setCategories((arr)=>arr.map(x=>x.id===c.id?{...x,name:val}:x));
+                          }}
+                        />
+                        <input
+                          type="color"
+                          value={c.color}
+                          onChange={(e)=>{
+                            const val = e.target.value; setCategories((arr)=>arr.map(x=>x.id===c.id?{...x,color:val}:x));
+                          }}
+                        />
+                        <button
+                          className="p-1 rounded-lg hover:bg-red-50 text-red-600"
+                          title="Remove category"
+                          onClick={()=>removeCategory(c.id)}
+                          disabled={categories.length<=1}
+                        >
+                          <Trash2 className="w-4 h-4"/>
+                        </button>
+                      </div>
+                    ))}
+                    <button onClick={addCategory} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4"/> Add category</button>
+                  </div>
+                  <div className="text-xs text-neutral-600">Tip: edit names/colors. You can delete categories; items using it are reassigned to the first category.</div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white shadow overflow-x-auto">
+                <div className="min-w-[900px]">
+                  <div className="p-3 flex items-center justify-between">
+                    <button onClick={()=>addRowAt()} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4"/> Add activity</button>
+                    <span className="text-xs text-neutral-500">Arraste para mover/redimensionar. Clique direito para trocar a categoria. <b>Duplo clique</b> no rótulo ou na barra para excluir.</span>
+                  </div>
+                  <div ref={gridRef} className="px-6 pb-6">
+                    <TimelinePreview
+                      rows={rows}
+                      setRows={setRows}
+                      categories={categories}
+                      labels={periodLabels}
+                      labelColWidth={labelColWidth}
+                      rowHeight={rowHeight}
+                      bgStripes={bgStripes}
+                      onAddRowAt={addRowAt}
+                      onRemoveRow={removeRow}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-xs text-neutral-500 pt-4">Para exportar imagem, tire um screenshot da prévia. Você ainda pode Exportar/Importar JSON para salvar e reabrir edições.</div>
+            </div>
+          </div>
+        );
+      }
+
+      function TimelinePreview({ rows, setRows, categories, labels, labelColWidth, rowHeight, bgStripes, onAddRowAt, onRemoveRow }) {
+        const cols = labels.length;
+        const gridTemplate = ` ${labelColWidth}px repeat(${cols}, minmax(100px, 1fr))`;
+        const containerRef = useRef(null);
+        const [menu, setMenu] = useState({ open:false, x:0, y:0, rowId:null });
+        const [drag, setDrag] = useState(null);
+
+        useEffect(()=>{
+          function onMove(e){
+            if(!drag || !containerRef.current) return;
+            const rect = containerRef.current.getBoundingClientRect();
+            const usable = rect.width - 0;
+            const x = Math.max(0, Math.min(e.clientX - rect.left, usable));
+            const per = usable / cols;
+            const deltaCols = Math.round((x - drag.startX) / per);
+            setRows((rs)=>rs.map((r)=>{
+              if(r.id !== drag.rowId) return r;
+              if(drag.type === "move"){
+                let ns = Math.max(0, Math.min(drag.startStart + deltaCols, cols-1));
+                let ne = ns + (drag.startEnd - drag.startStart);
+                if(ne > cols-1){ ne = cols-1; ns = ne - (drag.startEnd - drag.startStart); }
+                return { ...r, start: ns, end: ne };
+              }
+              if(drag.type === "left"){
+                let ns = Math.max(0, Math.min(drag.startStart + deltaCols, r.end));
+                return { ...r, start: Math.min(ns, r.end) };
+              }
+              if(drag.type === "right"){
+                let ne = Math.max(r.start, Math.min(drag.startEnd + deltaCols, cols-1));
+                return { ...r, end: Math.max(ne, r.start) };
+              }
+              return r;
+            }));
+          }
+          function onUp(){ setDrag(null); }
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+          return ()=>{ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+        }, [drag, cols, setRows]);
+
+        return (
+          <div className="w-full" onContextMenu={(e)=>e.preventDefault()}>
+            <div className="grid" style={{ gridTemplateColumns: gridTemplate }}>
+              <div></div>
+              {labels.map((l) => (
+                <div key={l} className="relative flex items-center justify-center">
+                  <div className="bg-[#073a4b] text-white px-3 py-1 rounded-b-xl text-sm font-semibold shadow">{l}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-2 grid" style={{ gridTemplateColumns: gridTemplate }}>
+              {rows.map((r, idx) => {
+                const cat = categories.find((c)=>c.id===r.category) || categories[0];
+                return (
+                  <React.Fragment key={r.id}>
+                    <div
+                      className={`flex items-center pl-4 pr-3 text-sm font-medium ${bgStripes && idx % 2 === 1 ? "bg-neutral-100" : "bg-neutral-200"}`}
+                      style={{ height: rowHeight }}
+                      onDoubleClick={()=>{
+                        if(confirm('Delete this activity?')) onRemoveRow(r.id);
+                      }}
+                    >
+                      <span contentEditable suppressContentEditableWarning onBlur={(e)=>{
+                        const name = e.currentTarget.textContent || "";
+                        setRows((rs)=>rs.map((x)=>x.id===r.id?{...x,name}:x));
+                      }}>{r.name}</span>
+                    </div>
+
+                    {Array.from({ length: cols }, (_, ci) => (
+                      <div key={ci} className={`${bgStripes && idx % 2 === 1 ? "bg-neutral-50" : "bg-neutral-100"} relative`} style={{ height: rowHeight }}>
+                        <div className="absolute right-0 top-0 h-full border-r border-dashed border-neutral-300" />
+                      </div>
+                    ))}
+
+                    <div className="col-start-2 col-end-[-1] relative" style={{ height: 0 }}>
+                      <div
+                        ref={idx===0?containerRef:null}
+                        className="absolute left-0 top-[-1px] h-[1px] w-full"
+                      />
+                      <div
+                        className="absolute group cursor-grab active:cursor-grabbing"
+                        onMouseDown={(e)=>{
+                          const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                          setDrag({ rowId:r.id, type:"move", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
+                        }}
+                        onDoubleClick={()=>{ if(confirm('Delete this activity?')) onRemoveRow(r.id); }}
+                        onContextMenu={(e)=>{
+                          e.preventDefault();
+                          setMenu({ open:true, x:e.clientX, y:e.clientY, rowId:r.id });
+                        }}
+                        style={{
+                          left: `calc((100% / ${cols}) * ${r.start})`,
+                          width: `calc((100% / ${cols}) * ${r.end - r.start + 1})`,
+                          top: -rowHeight + rowHeight * 0.15,
+                          height: rowHeight * 0.7,
+                          background: cat.color,
+                          borderRadius: 9999,
+                          boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+                        }}
+                        title={`${r.name} • ${labels[r.start]} → ${labels[r.end]}`}
+                      >
+                        <div
+                          className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-l-full"
+                          onMouseDown={(e)=>{
+                            const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
+                            setDrag({ rowId:r.id, type:"left", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
+                            e.stopPropagation();
+                          }}
+                        />
+                        <div
+                          className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-r-full"
+                          onMouseDown={(e)=>{
+                            const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
+                            setDrag({ rowId:r.id, type:"right", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
+                            e.stopPropagation();
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+
+            {menu.open && (
+              <div
+                className="fixed z-50 bg-white border shadow-lg rounded-xl p-2 text-sm min-w-[220px]"
+                style={{ left: menu.x + 2, top: menu.y + 2 }}
+                onMouseLeave={()=>setMenu({ open:false, x:0, y:0, rowId:null })}
+              >
+                <div className="px-2 py-1 text-xs text-neutral-500">Set category</div>
+                {categories.map((c)=> (
+                  <button key={c.id} onClick={()=>{ setRows((rs)=>rs.map((r)=>r.id===menu.rowId?{...r, category:c.id}:r)); setMenu({ open:false, x:0, y:0, rowId:null }); }} className="w-full flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-neutral-100">
+                    <span className="inline-block w-3 h-3 rounded-full" style={{ background:c.color }} /> {c.name}
+                  </button>
+                ))}
+                <div className="h-px my-1 bg-neutral-200" />
+                <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left" onClick={()=>{ onAddRowAt(rows.findIndex(r=>r.id===menu.rowId)+1); setMenu({ open:false, x:0, y:0, rowId:null }); }}>Add activity below</button>
+                <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left text-red-600" onClick={()=>{ onRemoveRow(menu.rowId); setMenu({ open:false, x:0, y:0, rowId:null }); }}>Delete activity</button>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<TimelineBuilder />);
+    </script>
+  </body>
+</html>

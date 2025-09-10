@@ -1,7 +1,11 @@
-# Ganttt Builder
-This is a gantt builder app.
+# Gantt Builder
 
-- Edite Periods/Prefix/Start index para configurar M0..M6 (ou o que quiser).
-- Em Categories, ajuste nomes e cores (a legenda atualiza automaticamente).
-- Em Activities, adicione linhas, escolha a categoria e defina Start e End (índices dos períodos).
-- Use Export PNG para baixar a imagem e Export/Import JSON para salvar/recarregar versões.
+This repository contains a small web application for composing simple Gantt-style timelines. Open `index.html` in your browser to use it.
+
+## Features
+- Configure period labels, starting index and count
+- Create, rename, recolor and remove categories
+- Add activities and drag or resize their bars directly on the timeline
+- Import or export timelines as JSON files for later editing
+
+The interface is implemented with [React](https://react.dev/) and styled with [Tailwind CSS](https://tailwindcss.com/) loaded from public CDNs. No build step is required.
