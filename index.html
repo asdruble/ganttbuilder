@@ -24,12 +24,12 @@
       ];
 
       const starterRows = [
-        { id: crypto.randomUUID(), name: "Discovery (Think)", category: "discovery", start: 0, end: 1 },
-        { id: crypto.randomUUID(), name: "Arquitetura Lake & AEP", category: "arquitetura", start: 1, end: 3 },
-        { id: crypto.randomUUID(), name: "Ingestão e QA AEP", category: "ingestao", start: 1, end: 3 },
-        { id: crypto.randomUUID(), name: "RTCDP > Salesforce", category: "integracao", start: 1, end: 3 },
-        { id: crypto.randomUUID(), name: "Ativação RTCDP > Salesforce", category: "ativacao", start: 3, end: 5 },
-        { id: crypto.randomUUID(), name: "Passagem de Conhecimento", category: "handoff", start: 4, end: 4 },
+        { id: crypto.randomUUID(), name: "Discovery (Think)", category: "discovery", start: 0, end: 1, type: "task" },
+        { id: crypto.randomUUID(), name: "Arquitetura Lake & AEP", category: "arquitetura", start: 1, end: 3, type: "task" },
+        { id: crypto.randomUUID(), name: "Ingestão e QA AEP", category: "ingestao", start: 1, end: 3, type: "task" },
+        { id: crypto.randomUUID(), name: "RTCDP > Salesforce", category: "integracao", start: 1, end: 3, type: "task" },
+        { id: crypto.randomUUID(), name: "Ativação RTCDP > Salesforce", category: "ativacao", start: 3, end: 5, type: "task" },
+        { id: crypto.randomUUID(), name: "Passagem de Conhecimento", category: "handoff", start: 4, end: 4, type: "milestone" },
       ];
 
       function TimelineBuilder() {
@@ -52,7 +52,15 @@
 
         function addRowAt(index = rows.length) {
           setRows((r) => {
-            const base = { id: crypto.randomUUID(), name: `Nova atividade ${r.length + 1}`, category: categories[0].id, start: 0, end: Math.min(1, periodCount - 1) };
+            const base = { id: crypto.randomUUID(), name: `Nova atividade ${r.length + 1}`, category: categories[0].id, start: 0, end: Math.min(1, periodCount - 1), type: "task" };
+            const copy = [...r];
+            copy.splice(index, 0, base);
+            return copy;
+          });
+        }
+        function addMilestoneAt(index = rows.length) {
+          setRows((r) => {
+            const base = { id: crypto.randomUUID(), name: `Novo marco ${r.length + 1}`, category: categories[0].id, start: 0, end: 0, type: "milestone" };
             const copy = [...r];
             copy.splice(index, 0, base);
             return copy;
@@ -82,7 +90,7 @@
           setRowHeight(j.rowHeight ?? 52);
           setColWidth(j.colWidth ?? 100);
           setCategories(j.categories ?? defaultCategories);
-          setRows(j.rows ?? []);
+          setRows((j.rows ?? []).map(r=>({ type: r.type ?? "task", ...r })));
           setBgStripes(Boolean(j.bgStripes));
         }
 
@@ -220,7 +228,10 @@
                 <div className="rounded-2xl bg-white shadow overflow-x-auto">
                   <div className="w-full">
                   <div className="p-3 flex items-center justify-between">
-                    <button onClick={()=>addRowAt()} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4"/> Add activity</button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={()=>addRowAt()} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4"/> Add activity</button>
+                      <button onClick={()=>addMilestoneAt()} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4"/> Add milestone</button>
+                    </div>
                     <span className="text-xs text-neutral-500">Arraste para mover/redimensionar. Clique direito para trocar a categoria. <b>Duplo clique</b> no rótulo ou na barra para excluir.</span>
                   </div>
                   <div ref={gridRef} className="px-6 pb-6">
@@ -233,6 +244,7 @@
                         rowHeight={rowHeight}
                         bgStripes={bgStripes}
                         onAddRowAt={addRowAt}
+                        onAddMilestoneAt={addMilestoneAt}
                         onRemoveRow={removeRow}
                         columnWidth={colWidth}
                       />
@@ -246,7 +258,7 @@
         );
       }
 
-        function TimelinePreview({ rows, setRows, categories, labels, labelColWidth, rowHeight, bgStripes, onAddRowAt, onRemoveRow, columnWidth }) {
+        function TimelinePreview({ rows, setRows, categories, labels, labelColWidth, rowHeight, bgStripes, onAddRowAt, onAddMilestoneAt, onRemoveRow, columnWidth }) {
           const cols = labels.length;
           const gridTemplate = ` ${labelColWidth}px repeat(${cols}, minmax(${columnWidth}px, 1fr))`;
         const containerRef = useRef(null);
@@ -326,45 +338,70 @@
                         ref={idx===0?containerRef:null}
                         className="absolute left-0 top-[-1px] h-[1px] w-full"
                       />
-                      <div
-                        className="absolute group cursor-grab active:cursor-grabbing"
-                        onMouseDown={(e)=>{
-                          const rect = e.currentTarget.parentElement.getBoundingClientRect();
-                          setDrag({ rowId:r.id, type:"move", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
-                        }}
-                        onDoubleClick={()=>{ if(confirm('Delete this activity?')) onRemoveRow(r.id); }}
-                        onContextMenu={(e)=>{
-                          e.preventDefault();
-                          setMenu({ open:true, x:e.clientX, y:e.clientY, rowId:r.id });
-                        }}
-                        style={{
-                          left: `calc((100% / ${cols}) * ${r.start})`,
-                          width: `calc((100% / ${cols}) * ${r.end - r.start + 1})`,
-                          top: -rowHeight + rowHeight * 0.15,
-                          height: rowHeight * 0.7,
-                          background: cat.color,
-                          borderRadius: 9999,
-                          boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
-                        }}
-                        title={`${r.name} • ${labels[r.start]} → ${labels[r.end]}`}
-                      >
+                      {r.type === "milestone" ? (
                         <div
-                          className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-l-full"
+                          className="absolute group cursor-grab active:cursor-grabbing"
                           onMouseDown={(e)=>{
-                            const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
-                            setDrag({ rowId:r.id, type:"left", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
-                            e.stopPropagation();
+                            const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                            setDrag({ rowId:r.id, type:"move", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
                           }}
+                          onDoubleClick={()=>{ if(confirm('Delete this activity?')) onRemoveRow(r.id); }}
+                          onContextMenu={(e)=>{
+                            e.preventDefault();
+                            setMenu({ open:true, x:e.clientX, y:e.clientY, rowId:r.id });
+                          }}
+                          style={{
+                            left: `calc((100% / ${cols}) * ${r.start + 0.5})`,
+                            top: -rowHeight + rowHeight * 0.15,
+                            width: rowHeight * 0.7,
+                            height: rowHeight * 0.7,
+                            background: cat.color,
+                            transform: "translate(-50%, 0) rotate(45deg)",
+                            boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+                          }}
+                          title={`${r.name} • ${labels[r.start]}`}
                         />
+                      ) : (
                         <div
-                          className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-r-full"
+                          className="absolute group cursor-grab active:cursor-grabbing"
                           onMouseDown={(e)=>{
-                            const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
-                            setDrag({ rowId:r.id, type:"right", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
-                            e.stopPropagation();
+                            const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                            setDrag({ rowId:r.id, type:"move", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
                           }}
-                        />
-                      </div>
+                          onDoubleClick={()=>{ if(confirm('Delete this activity?')) onRemoveRow(r.id); }}
+                          onContextMenu={(e)=>{
+                            e.preventDefault();
+                            setMenu({ open:true, x:e.clientX, y:e.clientY, rowId:r.id });
+                          }}
+                          style={{
+                            left: `calc((100% / ${cols}) * ${r.start})`,
+                            width: `calc((100% / ${cols}) * ${r.end - r.start + 1})`,
+                            top: -rowHeight + rowHeight * 0.15,
+                            height: rowHeight * 0.7,
+                            background: cat.color,
+                            borderRadius: 9999,
+                            boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+                          }}
+                          title={`${r.name} • ${labels[r.start]} → ${labels[r.end]}`}
+                        >
+                          <div
+                            className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-l-full"
+                            onMouseDown={(e)=>{
+                              const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
+                              setDrag({ rowId:r.id, type:"left", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
+                              e.stopPropagation();
+                            }}
+                          />
+                          <div
+                            className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-r-full"
+                            onMouseDown={(e)=>{
+                              const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
+                              setDrag({ rowId:r.id, type:"right", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
+                              e.stopPropagation();
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </React.Fragment>
                 );
@@ -385,6 +422,7 @@
                 ))}
                 <div className="h-px my-1 bg-neutral-200" />
                 <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left" onClick={()=>{ onAddRowAt(rows.findIndex(r=>r.id===menu.rowId)+1); setMenu({ open:false, x:0, y:0, rowId:null }); }}>Add activity below</button>
+                <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left" onClick={()=>{ onAddMilestoneAt(rows.findIndex(r=>r.id===menu.rowId)+1); setMenu({ open:false, x:0, y:0, rowId:null }); }}>Add milestone below</button>
                 <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left text-red-600" onClick={()=>{ onRemoveRow(menu.rowId); setMenu({ open:false, x:0, y:0, rowId:null }); }}>Delete activity</button>
               </div>
             )}
