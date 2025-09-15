@@ -6,6 +6,7 @@ This repository contains a small web application for composing simple Gantt-styl
 - Configure period labels, starting index and count
 - Create, rename, recolor and remove categories
 - Add activities and drag or resize their bars directly on the timeline
+- Add milestones shown as diamonds colored by category
 - Adjust label/column widths and row heights; layout responds to available space
 - Save or load timelines from browser local storage
 - Import or export timelines as JSON files for later editing
