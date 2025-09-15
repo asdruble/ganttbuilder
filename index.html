@@ -11,7 +11,7 @@
     <script type="text/babel" data-type="module" data-presets="react">
       import React, { useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18";
       import ReactDOM from "https://esm.sh/react-dom@18/client";
-      import { Plus, Trash2, Upload } from "https://esm.sh/lucide-react@0.276.0";
+      import { Plus, Trash2, Upload, ChevronDown, ChevronUp } from "https://esm.sh/lucide-react@0.276.0";
 
       // --- Types
       const defaultCategories = [
@@ -42,6 +42,8 @@
         const [categories, setCategories] = useState(defaultCategories);
         const [rows, setRows] = useState(starterRows);
         const [bgStripes, setBgStripes] = useState(true);
+        const [showSettings, setShowSettings] = useState(true);
+        const [showCategories, setShowCategories] = useState(true);
 
         const gridRef = useRef(null);
 
@@ -155,10 +157,16 @@
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl bg-white shadow">
-                  <h2 className="font-semibold mb-3">Timeline settings</h2>
-                  <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-2xl bg-white shadow">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="font-semibold">Timeline settings</h2>
+                      <button onClick={()=>setShowSettings(s=>!s)} className="p-1 rounded-lg hover:bg-neutral-100">
+                        {showSettings ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
+                      </button>
+                    </div>
+                    {showSettings && (
+                    <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-2">
                       <label className="text-sm">Periods</label>
                       <input type="number" min={1} max={36} value={periodCount} onChange={(e)=>setPeriodCount(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
@@ -188,11 +196,18 @@
                         <label htmlFor="bgstripes" className="text-sm">Alternate row stripes</label>
                       </div>
                     </div>
+                    )}
                   </div>
 
-                <div className="p-4 rounded-2xl bg-white shadow md:col-span-2">
-                  <h2 className="font-semibold mb-3">Categories</h2>
-                  <div className="flex flex-wrap gap-2 items-center mb-3">
+                  <div className="p-4 rounded-2xl bg-white shadow md:col-span-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="font-semibold">Categories</h2>
+                      <button onClick={()=>setShowCategories(s=>!s)} className="p-1 rounded-lg hover:bg-neutral-100">
+                        {showCategories ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
+                      </button>
+                    </div>
+                    {showCategories && (
+                    <div className="flex flex-wrap gap-2 items-center mb-3">
                     {categories.map((c) => (
                       <div key={c.id} className="flex items-center gap-2 bg-neutral-100 rounded-xl px-2 py-1">
                         <input
@@ -220,10 +235,11 @@
                       </div>
                     ))}
                     <button onClick={addCategory} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4"/> Add category</button>
+                    </div>
+                    <div className="text-xs text-neutral-600">Tip: edit names/colors. You can delete categories; items using it are reassigned to the first category.</div>
+                    )}
                   </div>
-                  <div className="text-xs text-neutral-600">Tip: edit names/colors. You can delete categories; items using it are reassigned to the first category.</div>
                 </div>
-              </div>
 
                 <div className="rounded-2xl bg-white shadow overflow-x-auto">
                   <div className="w-full">
