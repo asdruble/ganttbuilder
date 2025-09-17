@@ -32,10 +32,15 @@
         { id: crypto.randomUUID(), name: "Passagem de Conhecimento", category: "handoff", start: 4, end: 4, type: "milestone" },
       ];
 
+      const getTodayISO = () => new Date().toISOString().slice(0, 10);
+
       function TimelineBuilder() {
         const [periodPrefix, setPeriodPrefix] = useState("M");
         const [periodStartIndex, setPeriodStartIndex] = useState(0);
         const [periodCount, setPeriodCount] = useState(7);
+        const [timelineMode, setTimelineMode] = useState("periods");
+        const [dateStart, setDateStart] = useState(() => getTodayISO());
+        const [dateInterval, setDateInterval] = useState("weeks");
         const [labelColWidth, setLabelColWidth] = useState(320);
         const [rowHeight, setRowHeight] = useState(56);
         const [colWidth, setColWidth] = useState(100);
@@ -47,10 +52,26 @@
 
         const gridRef = useRef(null);
 
-        const periodLabels = useMemo(
-          () => Array.from({ length: periodCount }, (_, i) => `${periodPrefix}${i + periodStartIndex}`),
-          [periodPrefix, periodStartIndex, periodCount]
-        );
+        const weekFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }), []);
+        const monthFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "short" }), []);
+
+        const periodLabels = useMemo(() => {
+          if (timelineMode === "dates") {
+            const count = Math.max(0, periodCount);
+            let base = dateStart ? new Date(dateStart) : new Date();
+            if (Number.isNaN(base.getTime())) base = new Date();
+            return Array.from({ length: count }, (_, i) => {
+              const current = new Date(base);
+              if (dateInterval === "months") {
+                current.setMonth(base.getMonth() + i);
+                return monthFormatter.format(current).toUpperCase();
+              }
+              current.setDate(base.getDate() + i * 7);
+              return weekFormatter.format(current).toUpperCase();
+            });
+          }
+          return Array.from({ length: periodCount }, (_, i) => `${periodPrefix}${i + periodStartIndex}`);
+        }, [timelineMode, periodCount, periodPrefix, periodStartIndex, dateStart, dateInterval, weekFormatter, monthFormatter]);
 
         function addRowAt(index = rows.length) {
           setRows((r) => {
@@ -85,6 +106,9 @@
         }
 
         function applyData(j) {
+          setTimelineMode(j.timelineMode ?? "periods");
+          setDateStart(j.dateStart ?? getTodayISO());
+          setDateInterval(j.dateInterval ?? "weeks");
           setPeriodPrefix(j.periodPrefix ?? "M");
           setPeriodStartIndex(j.periodStartIndex ?? 0);
           setPeriodCount(j.periodCount ?? 6);
@@ -97,7 +121,7 @@
         }
 
         function exportJSON() {
-          const data = { periodPrefix, periodStartIndex, periodCount, labelColWidth, rowHeight, colWidth, categories, rows, bgStripes };
+          const data = { timelineMode, dateStart, dateInterval, periodPrefix, periodStartIndex, periodCount, labelColWidth, rowHeight, colWidth, categories, rows, bgStripes };
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
@@ -106,7 +130,7 @@
         }
 
         function saveLocal() {
-          const data = { periodPrefix, periodStartIndex, periodCount, labelColWidth, rowHeight, colWidth, categories, rows, bgStripes };
+          const data = { timelineMode, dateStart, dateInterval, periodPrefix, periodStartIndex, periodCount, labelColWidth, rowHeight, colWidth, categories, rows, bgStripes };
           localStorage.setItem("timeline-builder", JSON.stringify(data));
         }
 
@@ -168,17 +192,42 @@
                     {showSettings && (
                     <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-2">
-                      <label className="text-sm">Periods</label>
+                      <label className="text-sm">Label type</label>
+                      <select value={timelineMode} onChange={(e)=>setTimelineMode(e.target.value)} className="w-28 px-2 py-1 border rounded-lg">
+                        <option value="periods">Periods</option>
+                        <option value="dates">Dates</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm">{timelineMode === "periods" ? "Periods" : "Columns"}</label>
                       <input type="number" min={1} max={36} value={periodCount} onChange={(e)=>setPeriodCount(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="text-sm">Prefix</label>
-                      <input value={periodPrefix} onChange={(e)=>setPeriodPrefix(e.target.value)} className="w-28 px-2 py-1 border rounded-lg"/>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="text-sm">Start index</label>
-                      <input type="number" value={periodStartIndex} onChange={(e)=>setPeriodStartIndex(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
-                    </div>
+                    {timelineMode === "periods" ? (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-sm">Prefix</label>
+                          <input value={periodPrefix} onChange={(e)=>setPeriodPrefix(e.target.value)} className="w-28 px-2 py-1 border rounded-lg"/>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-sm">Start index</label>
+                          <input type="number" value={periodStartIndex} onChange={(e)=>setPeriodStartIndex(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-sm">Start date</label>
+                          <input type="date" value={dateStart} onChange={(e)=>setDateStart(e.target.value)} className="w-28 px-2 py-1 border rounded-lg"/>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-sm">Interval</label>
+                          <select value={dateInterval} onChange={(e)=>setDateInterval(e.target.value)} className="w-28 px-2 py-1 border rounded-lg">
+                            <option value="weeks">Weeks</option>
+                            <option value="months">Months</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
                     <div className="flex items-center justify-between gap-2">
                       <label className="text-sm">Label column (px)</label>
                       <input type="number" min={160} max={600} value={labelColWidth} onChange={(e)=>setLabelColWidth(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
