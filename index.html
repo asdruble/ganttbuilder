@@ -56,22 +56,64 @@
         const monthFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "short" }), []);
 
         const periodLabels = useMemo(() => {
+          const count = Math.max(0, periodCount);
           if (timelineMode === "dates") {
-            const count = Math.max(0, periodCount);
             let base = dateStart ? new Date(dateStart) : new Date();
             if (Number.isNaN(base.getTime())) base = new Date();
             return Array.from({ length: count }, (_, i) => {
               const current = new Date(base);
               if (dateInterval === "months") {
                 current.setMonth(base.getMonth() + i);
-                return monthFormatter.format(current).toUpperCase();
+                const id = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}`;
+                return {
+                  id: `month-${id}`,
+                  label: monthFormatter.format(current).toUpperCase(),
+                };
               }
               current.setDate(base.getDate() + i * 7);
-              return weekFormatter.format(current).toUpperCase();
+              const id = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
+              return {
+                id: `week-${id}`,
+                label: weekFormatter.format(current).toUpperCase(),
+              };
             });
           }
-          return Array.from({ length: periodCount }, (_, i) => `${periodPrefix}${i + periodStartIndex}`);
+          return Array.from({ length: count }, (_, i) => {
+            const index = i + periodStartIndex;
+            const label = `${periodPrefix}${index}`;
+            return { id: `period-${index}`, label };
+          });
         }, [timelineMode, periodCount, periodPrefix, periodStartIndex, dateStart, dateInterval, weekFormatter, monthFormatter]);
+
+        useEffect(() => {
+          setRows((rs) => {
+            if (!rs.length) return rs;
+            const maxIndex = periodLabels.length - 1;
+            if (maxIndex < 0) {
+              let changed = false;
+              const reset = rs.map((r) => {
+                if (r.start !== 0 || r.end !== 0) {
+                  changed = true;
+                  return { ...r, start: 0, end: 0 };
+                }
+                return r;
+              });
+              return changed ? reset : rs;
+            }
+            let changed = false;
+            const next = rs.map((r) => {
+              let start = Math.min(Math.max(0, r.start), maxIndex);
+              let end = Math.min(Math.max(0, r.end), maxIndex);
+              if (end < start) end = start;
+              if (start !== r.start || end !== r.end) {
+                changed = true;
+                return { ...r, start, end };
+              }
+              return r;
+            });
+            return changed ? next : rs;
+          });
+        }, [periodLabels.length, setRows]);
 
         function addRowAt(index = rows.length) {
           setRows((r) => {
@@ -369,9 +411,9 @@
           <div className="w-full" onContextMenu={(e)=>e.preventDefault()}>
             <div className="grid" style={{ gridTemplateColumns: gridTemplate }}>
               <div></div>
-              {labels.map((l) => (
-                <div key={l} className="relative flex items-center justify-center">
-                  <div className="bg-[#073a4b] text-white px-3 py-1 rounded-b-xl text-sm font-semibold shadow">{l}</div>
+              {labels.map((label, idx) => (
+                <div key={label.id ?? idx} className="relative flex items-center justify-center">
+                  <div className="bg-[#073a4b] text-white px-3 py-1 rounded-b-xl text-sm font-semibold shadow">{label.label}</div>
                 </div>
               ))}
             </div>
@@ -379,6 +421,8 @@
             <div className="mt-2 grid" style={{ gridTemplateColumns: gridTemplate }}>
               {rows.map((r, idx) => {
                 const cat = categories.find((c)=>c.id===r.category) || categories[0];
+                const startLabel = labels[r.start]?.label;
+                const endLabel = labels[r.end]?.label;
                 return (
                   <React.Fragment key={r.id}>
                     <div
@@ -426,7 +470,7 @@
                             transform: "translate(-50%, 0) rotate(45deg)",
                             boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
                           }}
-                          title={`${r.name} • ${labels[r.start]}`}
+                          title={startLabel ? `${r.name} • ${startLabel}` : r.name}
                         />
                       ) : (
                         <div
@@ -449,7 +493,7 @@
                             borderRadius: 9999,
                             boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
                           }}
-                          title={`${r.name} • ${labels[r.start]} → ${labels[r.end]}`}
+                          title={`${r.name}${startLabel ? ` • ${startLabel}` : ""}${endLabel && endLabel !== startLabel ? ` → ${endLabel}` : ""}`}
                         >
                           <div
                             className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-l-full"
