@@ -5,9 +5,31 @@
     <title>Gantt Builder</title>
     <script>
       window.tailwind = window.tailwind || {};
-      window.tailwind.config = {
-        darkMode: "class",
-      };
+      window.tailwind.config = window.tailwind.config || {};
+      window.tailwind.config.darkMode = "class";
+    </script>
+    <script>
+      (() => {
+        const root = document.documentElement;
+        if (!root) return;
+        const STORAGE_KEY = "timeline-builder-theme";
+        const apply = (value) => {
+          const isDark = value === "dark";
+          root.classList.toggle("dark", isDark);
+          root.style.colorScheme = isDark ? "dark" : "light";
+        };
+        try {
+          const stored = window.localStorage.getItem(STORAGE_KEY);
+          if (stored === "dark" || stored === "light") {
+            apply(stored);
+            return;
+          }
+        } catch (error) {
+          // Ignore storage access issues (e.g. private mode).
+        }
+        const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+        apply(prefersDark && prefersDark.matches ? "dark" : "light");
+      })();
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google tag (gtag.js) -->
@@ -24,7 +46,7 @@
     <div id="root"></div>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script type="text/babel" data-type="module" data-presets="react">
-      import React, { useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18";
+      import React, { useCallback, useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18";
       import ReactDOM from "https://esm.sh/react-dom@18/client";
       import { Plus, Trash2, Upload, ChevronDown, ChevronUp, Moon, Sun } from "https://esm.sh/lucide-react@0.276.0";
 
@@ -127,7 +149,23 @@
         const [currentChartId, setCurrentChartId] = useState(null);
         const [currentChartName, setCurrentChartName] = useState("");
         const [showLoadModal, setShowLoadModal] = useState(false);
-        const [theme, setTheme] = useState("light");
+        const [theme, setTheme] = useState(() =>
+          typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+            ? "dark"
+            : "light"
+        );
+
+        const applyTheme = useCallback((value) => {
+          if (typeof document === "undefined") return;
+          const rootEl = document.documentElement;
+          const bodyEl = document.body;
+          const isDark = value === "dark";
+          rootEl.classList.toggle("dark", isDark);
+          rootEl.style.colorScheme = isDark ? "dark" : "light";
+          if (bodyEl) {
+            bodyEl.style.colorScheme = isDark ? "dark" : "light";
+          }
+        }, []);
 
         const gridRef = useRef(null);
 
@@ -137,9 +175,6 @@
             const stored = localStorage.getItem(THEME_KEY);
             if (stored === "light" || stored === "dark") {
               setTheme(stored);
-              if (typeof document !== "undefined") {
-                document.documentElement.classList.toggle("dark", stored === "dark");
-              }
               return;
             }
           } catch (err) {
@@ -148,19 +183,10 @@
           const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
           const nextTheme = prefersDark && prefersDark.matches ? "dark" : "light";
           setTheme(nextTheme);
-          if (typeof document !== "undefined") {
-            document.documentElement.classList.toggle("dark", nextTheme === "dark");
-          }
         }, []);
 
         useEffect(() => {
-          if (typeof document === "undefined") return;
-          const rootEl = document.documentElement;
-          if (theme === "dark") {
-            rootEl.classList.add("dark");
-          } else {
-            rootEl.classList.remove("dark");
-          }
+          applyTheme(theme);
           if (typeof window !== "undefined") {
             try {
               localStorage.setItem(THEME_KEY, theme);
@@ -168,7 +194,7 @@
               console.error(err);
             }
           }
-        }, [theme]);
+        }, [theme, applyTheme]);
 
         const weekFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }), []);
         const monthFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "short" }), []);
@@ -260,6 +286,7 @@
           setTheme((prev) => {
             const next = prev === "dark" ? "light" : "dark";
             trackEvent("theme_toggle", { theme: next });
+            applyTheme(next);
             return next;
           });
         }
