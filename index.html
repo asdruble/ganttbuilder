@@ -4,9 +4,17 @@
     <meta charset="UTF-8" />
     <title>Gantt Builder</title>
     <script>
-      window.tailwind = window.tailwind || {};
-      window.tailwind.config = window.tailwind.config || {};
-      window.tailwind.config.darkMode = "class";
+      const globalScope = typeof globalThis !== "undefined" ? globalThis : window;
+      const existingTailwind = globalScope.tailwind || {};
+      const existingConfig = existingTailwind.config || {};
+      globalScope.tailwind = {
+        ...existingTailwind,
+        config: {
+          ...existingConfig,
+          darkMode: "class",
+        },
+      };
+      globalScope.tailwindcss = globalScope.tailwind;
     </script>
     <script>
       (() => {
