@@ -23,16 +23,38 @@
         { id: "handoff", name: "Passagem Conhecimento", color: "#ef7d32" },
       ];
 
-      const starterRows = [
-        { id: crypto.randomUUID(), name: "Discovery (Think)", category: "discovery", start: 0, end: 1, type: "task" },
-        { id: crypto.randomUUID(), name: "Arquitetura Lake & AEP", category: "arquitetura", start: 1, end: 3, type: "task" },
-        { id: crypto.randomUUID(), name: "Ingestão e QA AEP", category: "ingestao", start: 1, end: 3, type: "task" },
-        { id: crypto.randomUUID(), name: "RTCDP > Salesforce", category: "integracao", start: 1, end: 3, type: "task" },
-        { id: crypto.randomUUID(), name: "Ativação RTCDP > Salesforce", category: "ativacao", start: 3, end: 5, type: "task" },
-        { id: crypto.randomUUID(), name: "Passagem de Conhecimento", category: "handoff", start: 4, end: 4, type: "milestone" },
-      ];
+      function createStarterRows() {
+        return [
+          { id: crypto.randomUUID(), name: "Discovery (Think)", category: "discovery", start: 0, end: 1, type: "task" },
+          { id: crypto.randomUUID(), name: "Arquitetura Lake & AEP", category: "arquitetura", start: 1, end: 3, type: "task" },
+          { id: crypto.randomUUID(), name: "Ingestão e QA AEP", category: "ingestao", start: 1, end: 3, type: "task" },
+          { id: crypto.randomUUID(), name: "RTCDP > Salesforce", category: "integracao", start: 1, end: 3, type: "task" },
+          { id: crypto.randomUUID(), name: "Ativação RTCDP > Salesforce", category: "ativacao", start: 3, end: 5, type: "task" },
+          { id: crypto.randomUUID(), name: "Passagem de Conhecimento", category: "handoff", start: 4, end: 4, type: "milestone" },
+        ];
+      }
+
+      const STORAGE_KEY = "timeline-builder-saves";
+      const LEGACY_KEY = "timeline-builder";
 
       const getTodayISO = () => new Date().toISOString().slice(0, 10);
+
+      function createDefaultTimeline() {
+        return {
+          timelineMode: "periods",
+          dateStart: getTodayISO(),
+          dateInterval: "weeks",
+          periodPrefix: "M",
+          periodStartIndex: 0,
+          periodCount: 7,
+          labelColWidth: 320,
+          rowHeight: 56,
+          colWidth: 100,
+          categories: defaultCategories.map((c) => ({ ...c })),
+          rows: createStarterRows(),
+          bgStripes: true,
+        };
+      }
 
       function TimelineBuilder() {
         const [periodPrefix, setPeriodPrefix] = useState("M");
@@ -44,11 +66,15 @@
         const [labelColWidth, setLabelColWidth] = useState(320);
         const [rowHeight, setRowHeight] = useState(56);
         const [colWidth, setColWidth] = useState(100);
-        const [categories, setCategories] = useState(defaultCategories);
-        const [rows, setRows] = useState(starterRows);
+        const [categories, setCategories] = useState(() => defaultCategories.map((c) => ({ ...c })));
+        const [rows, setRows] = useState(() => createStarterRows());
         const [bgStripes, setBgStripes] = useState(true);
         const [showSettings, setShowSettings] = useState(true);
         const [showCategories, setShowCategories] = useState(true);
+        const [savedCharts, setSavedCharts] = useState([]);
+        const [currentChartId, setCurrentChartId] = useState(null);
+        const [currentChartName, setCurrentChartName] = useState("");
+        const [showLoadModal, setShowLoadModal] = useState(false);
 
         const gridRef = useRef(null);
 
@@ -147,44 +173,153 @@
           return `hsl(${h} 50% 45%)`;
         }
 
-        function applyData(j) {
-          setTimelineMode(j.timelineMode ?? "periods");
-          setDateStart(j.dateStart ?? getTodayISO());
-          setDateInterval(j.dateInterval ?? "weeks");
-          setPeriodPrefix(j.periodPrefix ?? "M");
-          setPeriodStartIndex(j.periodStartIndex ?? 0);
-          setPeriodCount(j.periodCount ?? 6);
-          setLabelColWidth(j.labelColWidth ?? 280);
-          setRowHeight(j.rowHeight ?? 52);
-          setColWidth(j.colWidth ?? 100);
-          setCategories(j.categories ?? defaultCategories);
-          setRows((j.rows ?? []).map(r=>({ type: r.type ?? "task", ...r })));
-          setBgStripes(Boolean(j.bgStripes));
+        function applyData(j = {}) {
+          const defaults = createDefaultTimeline();
+          const categoriesSource = Array.isArray(j.categories) && j.categories.length ? j.categories : defaults.categories;
+          const normalizedCategories = categoriesSource.map((c, idx) => ({
+            id: c.id ?? `category_${idx + 1}`,
+            name: c.name ?? `Category ${idx + 1}`,
+            color: c.color ?? randomColor(),
+          }));
+          const fallbackCategories = normalizedCategories.length ? normalizedCategories : defaults.categories;
+          const categoryIds = new Set(fallbackCategories.map((c) => c.id));
+          const fallbackCategoryId = fallbackCategories[0]?.id ?? defaults.categories[0]?.id ?? "";
+
+          const rowsSource = Array.isArray(j.rows) ? j.rows : defaults.rows;
+          const normalizedRows = rowsSource.map((r, idx) => {
+            const start = Number.isFinite(r.start) ? r.start : 0;
+            let end = Number.isFinite(r.end) ? r.end : start;
+            if (end < start) end = start;
+            const category = categoryIds.has(r.category) ? r.category : fallbackCategoryId;
+            return {
+              id: r.id ?? crypto.randomUUID(),
+              name: r.name ?? `Activity ${idx + 1}`,
+              category,
+              start,
+              end,
+              type: r.type === "milestone" ? "milestone" : "task",
+            };
+          });
+
+          setTimelineMode(j.timelineMode ?? defaults.timelineMode);
+          setDateStart(j.dateStart ?? defaults.dateStart);
+          setDateInterval(j.dateInterval ?? defaults.dateInterval);
+          setPeriodPrefix(j.periodPrefix ?? defaults.periodPrefix);
+          setPeriodStartIndex(j.periodStartIndex ?? defaults.periodStartIndex);
+          setPeriodCount(j.periodCount ?? defaults.periodCount);
+          setLabelColWidth(j.labelColWidth ?? defaults.labelColWidth);
+          setRowHeight(j.rowHeight ?? defaults.rowHeight);
+          setColWidth(j.colWidth ?? defaults.colWidth);
+          setCategories(fallbackCategories);
+          setRows(normalizedRows);
+          setBgStripes(j.bgStripes === undefined ? defaults.bgStripes : Boolean(j.bgStripes));
+        }
+
+        function getCurrentTimelineData() {
+          return {
+            timelineMode,
+            dateStart,
+            dateInterval,
+            periodPrefix,
+            periodStartIndex,
+            periodCount,
+            labelColWidth,
+            rowHeight,
+            colWidth,
+            categories,
+            rows,
+            bgStripes,
+          };
+        }
+
+        function updateSavedCharts(updater) {
+          setSavedCharts((prev) => {
+            const next = updater(prev);
+            const sorted = [...next].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
+            } catch (err) {
+              console.error(err);
+            }
+            return sorted;
+          });
+        }
+
+        function handleSave(options = {}) {
+          const { asCopy = false } = options;
+          let name = currentChartName.trim();
+          if (!name) {
+            const suggested = currentChartName || "Untitled chart";
+            const input = prompt("Give this chart a name:", suggested);
+            if (!input) return;
+            name = input.trim();
+            if (!name) return;
+          }
+          const id = asCopy || !currentChartId ? crypto.randomUUID() : currentChartId;
+          const payload = {
+            id,
+            name,
+            updatedAt: new Date().toISOString(),
+            data: getCurrentTimelineData(),
+          };
+          updateSavedCharts((charts) => {
+            const filtered = charts.filter((item) => item.id !== id);
+            return [...filtered, payload];
+          });
+          setCurrentChartId(id);
+          setCurrentChartName(name);
+        }
+
+        function handleSaveAs() {
+          handleSave({ asCopy: true });
+        }
+
+        function deleteSavedChart(id) {
+          const chart = savedCharts.find((c) => c.id === id);
+          if (chart && !confirm(`Delete "${chart.name}"?`)) return;
+          updateSavedCharts((charts) => charts.filter((item) => item.id !== id));
+          if (currentChartId === id) {
+            setCurrentChartId(null);
+          }
+        }
+
+        function loadChart(chart) {
+          if (!chart || !chart.data) return;
+          applyData(chart.data);
+          setCurrentChartId(chart.id);
+          setCurrentChartName(chart.name ?? "");
+          setShowLoadModal(false);
+        }
+
+        function startNewChart() {
+          const defaults = createDefaultTimeline();
+          applyData(defaults);
+          setCurrentChartId(null);
+          setCurrentChartName("");
+          setShowLoadModal(false);
+        }
+
+        function formatUpdatedAt(iso) {
+          if (!iso) return "";
+          const date = new Date(iso);
+          return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
         }
 
         function exportJSON() {
-          const data = { timelineMode, dateStart, dateInterval, periodPrefix, periodStartIndex, periodCount, labelColWidth, rowHeight, colWidth, categories, rows, bgStripes };
+          const data = getCurrentTimelineData();
           const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
+          const baseName = currentChartName.trim() || "timeline";
+          const safeName = baseName
+            .replace(/[^a-z0-9\-_.\s]/gi, "")
+            .trim()
+            .replace(/\s+/g, "-")
+            .toLowerCase() || "timeline";
           const a = document.createElement("a");
-          a.href = url; a.download = "timeline.json"; a.click();
+          a.href = url;
+          a.download = `${safeName}.json`;
+          a.click();
           URL.revokeObjectURL(url);
-        }
-
-        function saveLocal() {
-          const data = { timelineMode, dateStart, dateInterval, periodPrefix, periodStartIndex, periodCount, labelColWidth, rowHeight, colWidth, categories, rows, bgStripes };
-          localStorage.setItem("timeline-builder", JSON.stringify(data));
-        }
-
-        function loadLocal() {
-          const str = localStorage.getItem("timeline-builder");
-          if (!str) return;
-          try {
-            const j = JSON.parse(str);
-            applyData(j);
-          } catch (err) {
-            alert("Invalid saved timeline");
-          }
         }
 
         function importJSON(e) {
@@ -203,17 +338,85 @@
         }
 
         useEffect(() => {
-          loadLocal();
+          try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            let list = [];
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) {
+                list = parsed
+                  .filter((item) => item && typeof item === "object")
+                  .map((item, idx) => {
+                    const data = item.data && typeof item.data === "object" ? item.data : item;
+                    return {
+                      id: item.id ?? crypto.randomUUID(),
+                      name: item.name ?? `Saved chart ${idx + 1}`,
+                      updatedAt: item.updatedAt ?? new Date().toISOString(),
+                      data,
+                    };
+                  })
+                  .filter((item) => item.data && typeof item.data === "object");
+              }
+            }
+            if (!list.length) {
+              const legacy = localStorage.getItem(LEGACY_KEY);
+              if (legacy) {
+                try {
+                  const data = JSON.parse(legacy);
+                  if (data && typeof data === "object") {
+                    list = [
+                      {
+                        id: crypto.randomUUID(),
+                        name: "Migrated timeline",
+                        updatedAt: new Date().toISOString(),
+                        data,
+                      },
+                    ];
+                  }
+                } catch (err) {
+                  console.error(err);
+                }
+                localStorage.removeItem(LEGACY_KEY);
+              }
+            }
+            if (list.length) {
+              const sorted = [...list].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+              setSavedCharts(sorted);
+              setShowLoadModal(true);
+              try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
+              } catch (err) {
+                console.error(err);
+              }
+            } else {
+              startNewChart();
+            }
+          } catch (err) {
+            console.error(err);
+            startNewChart();
+          }
         }, []);
 
         return (
           <div className="w-full min-h-screen bg-neutral-50 text-neutral-900">
             <div className="w-full mx-auto px-4 py-6 flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Project Timeline (Gantt-style) Builder</h1>
-                <div className="flex gap-2">
-                  <button onClick={saveLocal} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Save</button>
-                  <button onClick={loadLocal} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Load</button>
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div className="flex flex-col gap-2">
+                  <h1 className="text-2xl font-bold">Project Timeline (Gantt-style) Builder</h1>
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                    <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">Chart name</label>
+                    <input
+                      value={currentChartName}
+                      onChange={(e)=>setCurrentChartName(e.target.value)}
+                      placeholder="Untitled chart"
+                      className="w-full sm:w-72 px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#073a4b]/40"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-end">
+                  <button onClick={()=>handleSave()} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Save</button>
+                  <button onClick={handleSaveAs} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Save as copy</button>
+                  <button onClick={()=>setShowLoadModal(true)} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Load</button>
                   <button onClick={exportJSON} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Export JSON</button>
                   <label className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100 cursor-pointer flex items-center gap-2">
                     <Upload className="w-4 h-4"/>
@@ -357,9 +560,83 @@
                         onRemoveRow={removeRow}
                         columnWidth={colWidth}
                       />
+            </div>
+            {showLoadModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-black/40">
+                <div className="relative w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
+                  <div className="mb-4 flex items-center justify-between gap-4">
+                    <h2 className="text-lg font-semibold text-neutral-900">Saved charts</h2>
+                    <button
+                      onClick={()=>setShowLoadModal(false)}
+                      className="text-sm font-medium text-neutral-500 hover:text-neutral-700"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  {savedCharts.length ? (
+                    <div className="flex max-h-[50vh] flex-col gap-3 overflow-y-auto pr-1">
+                      {savedCharts.map((chart) => {
+                        const updatedAt = formatUpdatedAt(chart.updatedAt);
+                        return (
+                          <div
+                            key={chart.id}
+                            className="flex flex-col gap-3 rounded-2xl border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-neutral-900">{chart.name || "Untitled chart"}</span>
+                                {chart.id === currentChartId && (
+                                  <span className="rounded-full bg-[#073a4b]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#073a4b]">
+                                    Current
+                                  </span>
+                                )}
+                              </div>
+                              {updatedAt && (
+                                <span className="text-xs text-neutral-500">Last updated {updatedAt}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={()=>loadChart(chart)}
+                                className="rounded-xl bg-[#073a4b] px-3 py-2 text-sm font-medium text-white shadow hover:bg-[#052835]"
+                              >
+                                Load
+                              </button>
+                              <button
+                                onClick={()=>deleteSavedChart(chart.id)}
+                                className="flex items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" /> Delete
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
+                      You don't have any saved charts yet. Create a new chart to get started.
+                    </div>
+                  )}
+                  <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <button
+                      onClick={startNewChart}
+                      className="w-full rounded-xl bg-[#3a7d85] px-4 py-2 text-sm font-medium text-white shadow hover:bg-[#2d6066] sm:w-auto"
+                    >
+                      Create new chart
+                    </button>
+                    <button
+                      onClick={()=>setShowLoadModal(false)}
+                      className="w-full rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 sm:w-auto"
+                    >
+                      Close
+                    </button>
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
 
               <div className="text-xs text-neutral-500 pt-4">Para exportar imagem, tire um screenshot da prévia. Você ainda pode Exportar/Importar JSON para salvar e reabrir edições.</div>
             </div>
