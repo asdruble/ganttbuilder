@@ -15,30 +15,20 @@
 
       // --- Types
       const defaultCategories = [
-        { id: "discovery", name: "Discovery/Think", color: "#073a4b" },
-        { id: "arquitetura", name: "Arquitetura", color: "#6aa5ab" },
-        { id: "ingestao", name: "Ingestão & QA", color: "#6699a0" },
-        { id: "integracao", name: "Integrações", color: "#4d8b92" },
-        { id: "ativacao", name: "Ativação", color: "#3a7d85" },
-        { id: "handoff", name: "Passagem Conhecimento", color: "#ef7d32" },
+        { id: "think", name: "Think", color: "#54C0E8" },
+        { id: "build", name: "Build", color: "#29475B" },
+        { id: "run", name: "Run", color: "#F98509" },
+        { id: "growth", name: "Growth", color: "#F98509" },
+        { id: "alert", name: "Integrações", color: "#C00000" },
       ];
 
       function createStarterRows() {
         return [
-          { id: crypto.randomUUID(), name: "Discovery (Think)", category: "discovery", start: 0, end: 1, type: "task" },
-          { id: crypto.randomUUID(), name: "Arquitetura Lake & AEP", category: "arquitetura", start: 1, end: 3, type: "task" },
-          { id: crypto.randomUUID(), name: "Ingestão e QA AEP", category: "ingestao", start: 1, end: 3, type: "task" },
-          { id: crypto.randomUUID(), name: "RTCDP > Salesforce", category: "integracao", start: 1, end: 3, type: "task" },
-          { id: crypto.randomUUID(), name: "Ativação RTCDP > Salesforce", category: "ativacao", start: 3, end: 5, type: "task" },
-          {
-            id: crypto.randomUUID(),
-            name: "Passagem de Conhecimento",
-            category: "handoff",
-            start: 4,
-            end: 4,
-            type: "milestone",
-            milestonePosition: 4.5,
-          },
+          { id: crypto.randomUUID(), name: "Discovery", category: "think", start: 0, end: 1, type: "task" },
+          { id: crypto.randomUUID(), name: "Implementação", category: "build", start: 1, end: 3, type: "task" },
+          { id: crypto.randomUUID(), name: "Validação", category: "alert", start: 3, end: 4, type: "task" },
+          { id: crypto.randomUUID(), name: "Ativação", category: "run", start: 4, end: 6, type: "milestone", milestonePosition: 4},
+          { id: crypto.randomUUID(), name: "Expansão", category: "growth", start: 6, end: 8, type: "task" },
         ];
       }
 
@@ -53,11 +43,11 @@
           dateStart: getTodayISO(),
           dateInterval: "weeks",
           periodPrefix: "M",
-          periodStartIndex: 0,
-          periodCount: 7,
+          periodStartIndex: 1,
+          periodCount: 8,
           labelColWidth: 320,
           rowHeight: 56,
-          colWidth: 100,
+          colWidth: 60,
           categories: defaultCategories.map((c) => ({ ...c })),
           rows: createStarterRows(),
           bgStripes: true,
@@ -527,15 +517,15 @@
                     )}
                     <div className="flex items-center justify-between gap-2">
                       <label className="text-sm">Label column (px)</label>
-                      <input type="number" min={160} max={600} value={labelColWidth} onChange={(e)=>setLabelColWidth(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
+                      <input type="number" min={100} max={600} value={labelColWidth} onChange={(e)=>setLabelColWidth(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
                     </div>
                       <div className="flex items-center justify-between gap-2">
                         <label className="text-sm">Row height (px)</label>
-                        <input type="number" min={36} max={120} value={rowHeight} onChange={(e)=>setRowHeight(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
+                        <input type="number" min={30} max={120} value={rowHeight} onChange={(e)=>setRowHeight(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
                       </div>
                       <div className="flex items-center justify-between gap-2">
                         <label className="text-sm">Column min width (px)</label>
-                        <input type="number" min={60} max={400} value={colWidth} onChange={(e)=>setColWidth(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
+                        <input type="number" min={30} max={400} value={colWidth} onChange={(e)=>setColWidth(Number(e.target.value))} className="w-28 px-2 py-1 border rounded-lg"/>
                       </div>
                       <div className="flex items-center gap-2">
                         <input id="bgstripes" type="checkbox" checked={bgStripes} onChange={(e)=>setBgStripes(e.target.checked)} />
