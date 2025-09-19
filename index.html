@@ -37,6 +37,32 @@
 
       const getTodayISO = () => new Date().toISOString().slice(0, 10);
 
+      function startOfDay(date) {
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      }
+
+      function parseISODateToLocal(value) {
+        if (typeof value !== "string") return null;
+        const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) return null;
+        const [, year, month, day] = match;
+        const numericYear = Number(year);
+        const numericMonth = Number(month) - 1;
+        const numericDay = Number(day);
+        if (!Number.isFinite(numericYear) || !Number.isFinite(numericMonth) || !Number.isFinite(numericDay)) {
+          return null;
+        }
+        const parsed = new Date(numericYear, numericMonth, numericDay);
+        if (
+          parsed.getFullYear() !== numericYear ||
+          parsed.getMonth() !== numericMonth ||
+          parsed.getDate() !== numericDay
+        ) {
+          return null;
+        }
+        return parsed;
+      }
+
       function createDefaultTimeline() {
         return {
           timelineMode: "periods",
@@ -82,8 +108,8 @@
         const periodLabels = useMemo(() => {
           const count = Math.max(0, periodCount);
           if (timelineMode === "dates") {
-            let base = dateStart ? new Date(dateStart) : new Date();
-            if (Number.isNaN(base.getTime())) base = new Date();
+            let base = parseISODateToLocal(dateStart);
+            if (!base) base = startOfDay(new Date());
             return Array.from({ length: count }, (_, i) => {
               const current = new Date(base);
               if (dateInterval === "months") {
