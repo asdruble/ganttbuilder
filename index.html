@@ -18,17 +18,17 @@
         { id: "think", name: "Think", color: "#54C0E8" },
         { id: "build", name: "Build", color: "#29475B" },
         { id: "run", name: "Run", color: "#F98509" },
-        { id: "growth", name: "Growth", color: "#F98509" },
-        { id: "alert", name: "Integrações", color: "#C00000" },
+        { id: "growth", name: "Growth", color: "#009759" },
+        { id: "alert", name: "Alert", color: "#C00000" },
       ];
 
       function createStarterRows() {
         return [
-          { id: crypto.randomUUID(), name: "Discovery", category: "think", start: 0, end: 1, type: "task" },
-          { id: crypto.randomUUID(), name: "Implementação", category: "build", start: 1, end: 3, type: "task" },
-          { id: crypto.randomUUID(), name: "Validação", category: "alert", start: 3, end: 4, type: "task" },
-          { id: crypto.randomUUID(), name: "Ativação", category: "run", start: 4, end: 6, type: "milestone", milestonePosition: 4},
-          { id: crypto.randomUUID(), name: "Expansão", category: "growth", start: 6, end: 8, type: "task" },
+          { id: crypto.randomUUID(), name: "Discovery", category: "think", start: 0, end: 0, type: "task" },
+          { id: crypto.randomUUID(), name: "Implementação", category: "build", start: 1, end: 2, type: "task" },
+          { id: crypto.randomUUID(), name: "Validação", category: "alert", start: 3, end: 3, type: "task" },
+          { id: crypto.randomUUID(), name: "Ativação", category: "run", start: 4, end: 4, type: "milestone", milestonePosition: 4},
+          { id: crypto.randomUUID(), name: "Expansão", category: "growth", start: 4, end: 5, type: "task" },
         ];
       }
 
@@ -44,7 +44,7 @@
           dateInterval: "weeks",
           periodPrefix: "M",
           periodStartIndex: 1,
-          periodCount: 8,
+          periodCount: 6,
           labelColWidth: 320,
           rowHeight: 56,
           colWidth: 60,
