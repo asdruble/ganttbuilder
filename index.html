@@ -1,602 +1,604 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Gantt Builder</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-QZRZP1JZGJ"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
 
-      gtag('config', 'G-QZRZP1JZGJ');
-    </script>
-  </head>
-  <body class="min-h-screen bg-neutral-50">
-    <div id="root"></div>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script type="text/babel" data-type="module" data-presets="react">
-      import React, { useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18";
-      import ReactDOM from "https://esm.sh/react-dom@18/client";
-      import { Plus, Trash2, Upload, ChevronDown, ChevronUp } from "https://esm.sh/lucide-react@0.276.0";
+<head>
+  <meta charset="UTF-8" />
+  <title>Gantt Builder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-QZRZP1JZGJ"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
 
-      const DEFAULT_EVENT_CATEGORY = "app_interaction";
+    gtag('config', 'G-QZRZP1JZGJ');
+  </script>
+</head>
 
-      function trackEvent(action, params = {}) {
-        if (typeof window === "undefined") return;
-        const payload = params.event_category ? params : { event_category: DEFAULT_EVENT_CATEGORY, ...params };
-        if (typeof window.gtag === "function") {
-          window.gtag("event", action, payload);
-        } else if (Array.isArray(window.dataLayer)) {
-          window.dataLayer.push({ event: action, ...payload });
-        }
+<body class="min-h-screen bg-neutral-50">
+  <div id="root"></div>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel" data-type="module" data-presets="react">
+    import React, { useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18";
+    import ReactDOM from "https://esm.sh/react-dom@18/client";
+    import { Plus, Trash2, Upload, ChevronDown, ChevronUp, GripVertical } from "https://esm.sh/lucide-react@0.276.0";
+
+    const DEFAULT_EVENT_CATEGORY = "app_interaction";
+
+    function trackEvent(action, params = {}) {
+      if (typeof window === "undefined") return;
+      const payload = params.event_category ? params : { event_category: DEFAULT_EVENT_CATEGORY, ...params };
+      if (typeof window.gtag === "function") {
+        window.gtag("event", action, payload);
+      } else if (Array.isArray(window.dataLayer)) {
+        window.dataLayer.push({ event: action, ...payload });
       }
+    }
 
-      // --- Types
-      const defaultCategories = [
-        { id: "think", name: "Think", color: "#54C0E8" },
-        { id: "build", name: "Build", color: "#29475B" },
-        { id: "run", name: "Run", color: "#F98509" },
-        { id: "growth", name: "Growth", color: "#009759" },
-        { id: "alert", name: "Alert", color: "#C00000" },
+    // --- Types
+    const defaultCategories = [
+      { id: "think", name: "Think", color: "#54C0E8" },
+      { id: "build", name: "Build", color: "#29475B" },
+      { id: "run", name: "Run", color: "#F98509" },
+      { id: "growth", name: "Growth", color: "#009759" },
+      { id: "alert", name: "Alert", color: "#C00000" },
+    ];
+
+    function createStarterRows() {
+      return [
+        { id: crypto.randomUUID(), name: "Discovery", category: "think", start: 0, end: 0, type: "task" },
+        { id: crypto.randomUUID(), name: "Implementação", category: "build", start: 1, end: 2, type: "task" },
+        { id: crypto.randomUUID(), name: "Validação", category: "alert", start: 3, end: 3, type: "task" },
+        { id: crypto.randomUUID(), name: "Ativação", category: "run", start: 4, end: 4, type: "milestone", milestonePosition: 4 },
+        { id: crypto.randomUUID(), name: "Expansão", category: "growth", start: 4, end: 5, type: "task" },
       ];
+    }
 
-      function createStarterRows() {
-        return [
-          { id: crypto.randomUUID(), name: "Discovery", category: "think", start: 0, end: 0, type: "task" },
-          { id: crypto.randomUUID(), name: "Implementação", category: "build", start: 1, end: 2, type: "task" },
-          { id: crypto.randomUUID(), name: "Validação", category: "alert", start: 3, end: 3, type: "task" },
-          { id: crypto.randomUUID(), name: "Ativação", category: "run", start: 4, end: 4, type: "milestone", milestonePosition: 4},
-          { id: crypto.randomUUID(), name: "Expansão", category: "growth", start: 4, end: 5, type: "task" },
-        ];
+    const STORAGE_KEY = "timeline-builder-saves";
+    const LEGACY_KEY = "timeline-builder";
+
+    const getTodayISO = () => new Date().toISOString().slice(0, 10);
+
+    function startOfDay(date) {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    }
+
+    function parseISODateToLocal(value) {
+      if (typeof value !== "string") return null;
+      const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return null;
+      const [, year, month, day] = match;
+      const numericYear = Number(year);
+      const numericMonth = Number(month) - 1;
+      const numericDay = Number(day);
+      if (!Number.isFinite(numericYear) || !Number.isFinite(numericMonth) || !Number.isFinite(numericDay)) {
+        return null;
       }
-
-      const STORAGE_KEY = "timeline-builder-saves";
-      const LEGACY_KEY = "timeline-builder";
-
-      const getTodayISO = () => new Date().toISOString().slice(0, 10);
-
-      function startOfDay(date) {
-        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const parsed = new Date(numericYear, numericMonth, numericDay);
+      if (
+        parsed.getFullYear() !== numericYear ||
+        parsed.getMonth() !== numericMonth ||
+        parsed.getDate() !== numericDay
+      ) {
+        return null;
       }
+      return parsed;
+    }
 
-      function parseISODateToLocal(value) {
-        if (typeof value !== "string") return null;
-        const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (!match) return null;
-        const [, year, month, day] = match;
-        const numericYear = Number(year);
-        const numericMonth = Number(month) - 1;
-        const numericDay = Number(day);
-        if (!Number.isFinite(numericYear) || !Number.isFinite(numericMonth) || !Number.isFinite(numericDay)) {
-          return null;
-        }
-        const parsed = new Date(numericYear, numericMonth, numericDay);
-        if (
-          parsed.getFullYear() !== numericYear ||
-          parsed.getMonth() !== numericMonth ||
-          parsed.getDate() !== numericDay
-        ) {
-          return null;
-        }
-        return parsed;
-      }
+    function createDefaultTimeline() {
+      return {
+        timelineMode: "periods",
+        dateStart: getTodayISO(),
+        dateInterval: "weeks",
+        periodPrefix: "M",
+        periodStartIndex: 1,
+        periodCount: 6,
+        labelColWidth: 320,
+        rowHeight: 56,
+        colWidth: 60,
+        categories: defaultCategories.map((c) => ({ ...c })),
+        rows: createStarterRows(),
+        bgStripes: true,
+      };
+    }
 
-      function createDefaultTimeline() {
-        return {
-          timelineMode: "periods",
-          dateStart: getTodayISO(),
-          dateInterval: "weeks",
-          periodPrefix: "M",
-          periodStartIndex: 1,
-          periodCount: 6,
-          labelColWidth: 320,
-          rowHeight: 56,
-          colWidth: 60,
-          categories: defaultCategories.map((c) => ({ ...c })),
-          rows: createStarterRows(),
-          bgStripes: true,
-        };
-      }
+    function TimelineBuilder() {
+      const [periodPrefix, setPeriodPrefix] = useState("M");
+      const [periodStartIndex, setPeriodStartIndex] = useState(0);
+      const [periodCount, setPeriodCount] = useState(7);
+      const [timelineMode, setTimelineMode] = useState("periods");
+      const [dateStart, setDateStart] = useState(() => getTodayISO());
+      const [dateInterval, setDateInterval] = useState("weeks");
+      const [labelColWidth, setLabelColWidth] = useState(320);
+      const [rowHeight, setRowHeight] = useState(56);
+      const [colWidth, setColWidth] = useState(100);
+      const [categories, setCategories] = useState(() => defaultCategories.map((c) => ({ ...c })));
+      const [rows, setRows] = useState(() => createStarterRows());
+      const [bgStripes, setBgStripes] = useState(true);
+      const [showSettings, setShowSettings] = useState(true);
+      const [showCategories, setShowCategories] = useState(true);
+      const [savedCharts, setSavedCharts] = useState([]);
+      const [currentChartId, setCurrentChartId] = useState(null);
+      const [currentChartName, setCurrentChartName] = useState("");
+      const [showLoadModal, setShowLoadModal] = useState(false);
 
-      function TimelineBuilder() {
-        const [periodPrefix, setPeriodPrefix] = useState("M");
-        const [periodStartIndex, setPeriodStartIndex] = useState(0);
-        const [periodCount, setPeriodCount] = useState(7);
-        const [timelineMode, setTimelineMode] = useState("periods");
-        const [dateStart, setDateStart] = useState(() => getTodayISO());
-        const [dateInterval, setDateInterval] = useState("weeks");
-        const [labelColWidth, setLabelColWidth] = useState(320);
-        const [rowHeight, setRowHeight] = useState(56);
-        const [colWidth, setColWidth] = useState(100);
-        const [categories, setCategories] = useState(() => defaultCategories.map((c) => ({ ...c })));
-        const [rows, setRows] = useState(() => createStarterRows());
-        const [bgStripes, setBgStripes] = useState(true);
-        const [showSettings, setShowSettings] = useState(true);
-        const [showCategories, setShowCategories] = useState(true);
-        const [savedCharts, setSavedCharts] = useState([]);
-        const [currentChartId, setCurrentChartId] = useState(null);
-        const [currentChartName, setCurrentChartName] = useState("");
-        const [showLoadModal, setShowLoadModal] = useState(false);
+      const gridRef = useRef(null);
 
-        const gridRef = useRef(null);
+      const weekFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }), []);
+      const monthFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "short" }), []);
 
-        const weekFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }), []);
-        const monthFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "short" }), []);
-
-        const periodLabels = useMemo(() => {
-          const count = Math.max(0, periodCount);
-          if (timelineMode === "dates") {
-            let base = parseISODateToLocal(dateStart);
-            if (!base) base = startOfDay(new Date());
-            return Array.from({ length: count }, (_, i) => {
-              const current = new Date(base);
-              if (dateInterval === "months") {
-                current.setMonth(base.getMonth() + i);
-                const id = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}`;
-                return {
-                  id: `month-${id}`,
-                  label: monthFormatter.format(current).toUpperCase(),
-                };
-              }
-              current.setDate(base.getDate() + i * 7);
-              const id = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
-              return {
-                id: `week-${id}`,
-                label: weekFormatter.format(current).toUpperCase(),
-              };
-            });
-          }
+      const periodLabels = useMemo(() => {
+        const count = Math.max(0, periodCount);
+        if (timelineMode === "dates") {
+          let base = parseISODateToLocal(dateStart);
+          if (!base) base = startOfDay(new Date());
           return Array.from({ length: count }, (_, i) => {
-            const index = i + periodStartIndex;
-            const label = `${periodPrefix}${index}`;
-            return { id: `period-${index}`, label };
-          });
-        }, [timelineMode, periodCount, periodPrefix, periodStartIndex, dateStart, dateInterval, weekFormatter, monthFormatter]);
-
-        useEffect(() => {
-          setRows((rs) => {
-            if (!rs.length) return rs;
-            const maxIndex = periodLabels.length - 1;
-            if (maxIndex < 0) {
-              let changed = false;
-              const reset = rs.map((r) => {
-                if (r.type === "milestone") {
-                  const currentPosition = Number.isFinite(r.milestonePosition) ? r.milestonePosition : 0;
-                  if (r.start !== 0 || r.end !== 0 || currentPosition !== 0) {
-                    changed = true;
-                    return { ...r, start: 0, end: 0, milestonePosition: 0 };
-                  }
-                  return r;
-                }
-                if (r.start !== 0 || r.end !== 0) {
-                  changed = true;
-                  return { ...r, start: 0, end: 0 };
-                }
-                return r;
-              });
-              return changed ? reset : rs;
+            const current = new Date(base);
+            if (dateInterval === "months") {
+              current.setMonth(base.getMonth() + i);
+              const id = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}`;
+              return {
+                id: `month-${id}`,
+                label: monthFormatter.format(current).toUpperCase(),
+              };
             }
-            const minMilestonePosition = 0.5;
-            const maxMilestonePosition = maxIndex + 0.5;
+            current.setDate(base.getDate() + i * 7);
+            const id = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
+            return {
+              id: `week-${id}`,
+              label: weekFormatter.format(current).toUpperCase(),
+            };
+          });
+        }
+        return Array.from({ length: count }, (_, i) => {
+          const index = i + periodStartIndex;
+          const label = `${periodPrefix}${index}`;
+          return { id: `period-${index}`, label };
+        });
+      }, [timelineMode, periodCount, periodPrefix, periodStartIndex, dateStart, dateInterval, weekFormatter, monthFormatter]);
+
+      useEffect(() => {
+        setRows((rs) => {
+          if (!rs.length) return rs;
+          const maxIndex = periodLabels.length - 1;
+          if (maxIndex < 0) {
             let changed = false;
-            const next = rs.map((r) => {
+            const reset = rs.map((r) => {
               if (r.type === "milestone") {
-                const rawPosition = Number.isFinite(r.milestonePosition) ? r.milestonePosition : r.start + 0.5;
-                const clamped = Math.min(maxMilestonePosition, Math.max(minMilestonePosition, rawPosition));
-                const snapped = Math.round(clamped * 2) / 2;
-                const nextStart = Math.min(maxIndex, Math.max(0, Math.floor(snapped)));
-                if (r.start !== nextStart || r.end !== nextStart || r.milestonePosition !== snapped) {
+                const currentPosition = Number.isFinite(r.milestonePosition) ? r.milestonePosition : 0;
+                if (r.start !== 0 || r.end !== 0 || currentPosition !== 0) {
                   changed = true;
-                  return { ...r, start: nextStart, end: nextStart, milestonePosition: snapped };
+                  return { ...r, start: 0, end: 0, milestonePosition: 0 };
                 }
                 return r;
               }
-              const safeStart = Number.isFinite(r.start) ? r.start : 0;
-              const safeEnd = Number.isFinite(r.end) ? r.end : safeStart;
-              let start = Math.min(Math.max(0, Math.round(safeStart)), maxIndex);
-              let end = Math.min(Math.max(0, Math.round(safeEnd)), maxIndex);
-              if (end < start) end = start;
-              if (start !== r.start || end !== r.end) {
+              if (r.start !== 0 || r.end !== 0) {
                 changed = true;
-                return { ...r, start, end };
+                return { ...r, start: 0, end: 0 };
               }
               return r;
             });
-            return changed ? next : rs;
-          });
-        }, [periodLabels.length, setRows]);
-
-        function addRowAt(index = rows.length) {
-          let createdRow = null;
-          let createdIndex = index;
-          setRows((r) => {
-            const base = {
-              id: crypto.randomUUID(),
-              name: `Nova atividade ${r.length + 1}`,
-              category: categories[0].id,
-              start: 0,
-              end: Math.min(1, periodCount - 1),
-              type: "task",
-            };
-            const copy = [...r];
-            const safeIndex = Math.min(Math.max(0, index), copy.length);
-            copy.splice(safeIndex, 0, base);
-            createdRow = base;
-            createdIndex = safeIndex;
-            return copy;
-          });
-          if (createdRow) {
-            trackEvent("activity_add", { row_id: createdRow.id, row_type: createdRow.type, insert_index: createdIndex });
+            return changed ? reset : rs;
           }
-        }
-        function addMilestoneAt(index = rows.length) {
-          let createdRow = null;
-          let createdIndex = index;
-          setRows((r) => {
-            const base = {
-              id: crypto.randomUUID(),
-              name: `Novo marco ${r.length + 1}`,
-              category: categories[0].id,
-              start: 0,
-              end: 0,
-              type: "milestone",
-              milestonePosition: 0.5,
-            };
-            const copy = [...r];
-            const safeIndex = Math.min(Math.max(0, index), copy.length);
-            copy.splice(safeIndex, 0, base);
-            createdRow = base;
-            createdIndex = safeIndex;
-            return copy;
+          const minMilestonePosition = 0.5;
+          const maxMilestonePosition = maxIndex + 0.5;
+          let changed = false;
+          const next = rs.map((r) => {
+            if (r.type === "milestone") {
+              const rawPosition = Number.isFinite(r.milestonePosition) ? r.milestonePosition : r.start + 0.5;
+              const clamped = Math.min(maxMilestonePosition, Math.max(minMilestonePosition, rawPosition));
+              const snapped = Math.round(clamped * 2) / 2;
+              const nextStart = Math.min(maxIndex, Math.max(0, Math.floor(snapped)));
+              if (r.start !== nextStart || r.end !== nextStart || r.milestonePosition !== snapped) {
+                changed = true;
+                return { ...r, start: nextStart, end: nextStart, milestonePosition: snapped };
+              }
+              return r;
+            }
+            const safeStart = Number.isFinite(r.start) ? r.start : 0;
+            const safeEnd = Number.isFinite(r.end) ? r.end : safeStart;
+            let start = Math.min(Math.max(0, Math.round(safeStart)), maxIndex);
+            let end = Math.min(Math.max(0, Math.round(safeEnd)), maxIndex);
+            if (end < start) end = start;
+            if (start !== r.start || end !== r.end) {
+              changed = true;
+              return { ...r, start, end };
+            }
+            return r;
           });
-          if (createdRow) {
-            trackEvent("milestone_add", { row_id: createdRow.id, insert_index: createdIndex });
-          }
-        }
-        function removeRow(id) {
-          const row = rows.find((x) => x.id === id);
-          setRows((r) => r.filter((x) => x.id !== id));
-          trackEvent("timeline_item_remove", { row_id: id, row_type: row?.type ?? "task" });
-        }
+          return changed ? next : rs;
+        });
+      }, [periodLabels.length, setRows]);
 
-        function addCategory() {
-          let createdCategory = null;
-          setCategories((c) => {
-            const next = { id: `cat_${c.length + 1}`, name: `Categoria ${c.length + 1}`, color: randomColor() };
-            createdCategory = next;
-            return [...c, next];
-          });
-          if (createdCategory) {
-            trackEvent("category_add", { category_id: createdCategory.id, category_name: createdCategory.name });
-          }
+      function addRowAt(index = rows.length) {
+        let createdRow = null;
+        let createdIndex = index;
+        setRows((r) => {
+          const base = {
+            id: crypto.randomUUID(),
+            name: `Nova atividade ${r.length + 1}`,
+            category: categories[0].id,
+            start: 0,
+            end: Math.min(1, periodCount - 1),
+            type: "task",
+          };
+          const copy = [...r];
+          const safeIndex = Math.min(Math.max(0, index), copy.length);
+          copy.splice(safeIndex, 0, base);
+          createdRow = base;
+          createdIndex = safeIndex;
+          return copy;
+        });
+        if (createdRow) {
+          trackEvent("activity_add", { row_id: createdRow.id, row_type: createdRow.type, insert_index: createdIndex });
         }
-        function removeCategory(id) {
-          if (categories.length <= 1) return;
-          const category = categories.find((c) => c.id === id);
-          setRows((rs) => rs.map((r) => (r.category === id ? { ...r, category: categories[0].id } : r)));
-          setCategories((cs) => cs.filter((c) => c.id !== id));
-          trackEvent("category_remove", { category_id: id, category_name: category?.name });
+      }
+      function addMilestoneAt(index = rows.length) {
+        let createdRow = null;
+        let createdIndex = index;
+        setRows((r) => {
+          const base = {
+            id: crypto.randomUUID(),
+            name: `Novo marco ${r.length + 1}`,
+            category: categories[0].id,
+            start: 0,
+            end: 0,
+            type: "milestone",
+            milestonePosition: 0.5,
+          };
+          const copy = [...r];
+          const safeIndex = Math.min(Math.max(0, index), copy.length);
+          copy.splice(safeIndex, 0, base);
+          createdRow = base;
+          createdIndex = safeIndex;
+          return copy;
+        });
+        if (createdRow) {
+          trackEvent("milestone_add", { row_id: createdRow.id, insert_index: createdIndex });
         }
-        function randomColor() {
-          const h = Math.floor(Math.random() * 360);
-          return `hsl(${h} 50% 45%)`;
-        }
+      }
+      function removeRow(id) {
+        const row = rows.find((x) => x.id === id);
+        setRows((r) => r.filter((x) => x.id !== id));
+        trackEvent("timeline_item_remove", { row_id: id, row_type: row?.type ?? "task" });
+      }
 
-        function applyData(j = {}) {
-          const defaults = createDefaultTimeline();
-          const categoriesSource = Array.isArray(j.categories) && j.categories.length ? j.categories : defaults.categories;
-          const normalizedCategories = categoriesSource.map((c, idx) => ({
-            id: c.id ?? `category_${idx + 1}`,
-            name: c.name ?? `Category ${idx + 1}`,
-            color: c.color ?? randomColor(),
-          }));
-          const fallbackCategories = normalizedCategories.length ? normalizedCategories : defaults.categories;
-          const categoryIds = new Set(fallbackCategories.map((c) => c.id));
-          const fallbackCategoryId = fallbackCategories[0]?.id ?? defaults.categories[0]?.id ?? "";
+      function addCategory() {
+        let createdCategory = null;
+        setCategories((c) => {
+          const next = { id: `cat_${c.length + 1}`, name: `Categoria ${c.length + 1}`, color: randomColor() };
+          createdCategory = next;
+          return [...c, next];
+        });
+        if (createdCategory) {
+          trackEvent("category_add", { category_id: createdCategory.id, category_name: createdCategory.name });
+        }
+      }
+      function removeCategory(id) {
+        if (categories.length <= 1) return;
+        const category = categories.find((c) => c.id === id);
+        setRows((rs) => rs.map((r) => (r.category === id ? { ...r, category: categories[0].id } : r)));
+        setCategories((cs) => cs.filter((c) => c.id !== id));
+        trackEvent("category_remove", { category_id: id, category_name: category?.name });
+      }
+      function randomColor() {
+        const h = Math.floor(Math.random() * 360);
+        return `hsl(${h} 50% 45%)`;
+      }
 
-          const rowsSource = Array.isArray(j.rows) ? j.rows : defaults.rows;
-          const normalizedRows = rowsSource.map((r, idx) => {
-            let start = Number.isFinite(r.start) ? r.start : 0;
-            let end = Number.isFinite(r.end) ? r.end : start;
-            const category = categoryIds.has(r.category) ? r.category : fallbackCategoryId;
-            const type = r.type === "milestone" ? "milestone" : "task";
-            if (type !== "milestone" && end < start) end = start;
-            if (type === "milestone") end = start;
-            start = Math.floor(start);
-            end = Math.floor(end);
-            const baseRow = {
-              id: r.id ?? crypto.randomUUID(),
-              name: r.name ?? `Activity ${idx + 1}`,
-              category,
-              start,
-              end,
-              type,
-            };
-            if (type === "milestone") {
-              const rawPosition = Number.isFinite(r.milestonePosition)
-                ? r.milestonePosition
-                : Number.isFinite(r.position)
+      function applyData(j = {}) {
+        const defaults = createDefaultTimeline();
+        const categoriesSource = Array.isArray(j.categories) && j.categories.length ? j.categories : defaults.categories;
+        const normalizedCategories = categoriesSource.map((c, idx) => ({
+          id: c.id ?? `category_${idx + 1}`,
+          name: c.name ?? `Category ${idx + 1}`,
+          color: c.color ?? randomColor(),
+        }));
+        const fallbackCategories = normalizedCategories.length ? normalizedCategories : defaults.categories;
+        const categoryIds = new Set(fallbackCategories.map((c) => c.id));
+        const fallbackCategoryId = fallbackCategories[0]?.id ?? defaults.categories[0]?.id ?? "";
+
+        const rowsSource = Array.isArray(j.rows) ? j.rows : defaults.rows;
+        const normalizedRows = rowsSource.map((r, idx) => {
+          let start = Number.isFinite(r.start) ? r.start : 0;
+          let end = Number.isFinite(r.end) ? r.end : start;
+          const category = categoryIds.has(r.category) ? r.category : fallbackCategoryId;
+          const type = r.type === "milestone" ? "milestone" : "task";
+          if (type !== "milestone" && end < start) end = start;
+          if (type === "milestone") end = start;
+          start = Math.floor(start);
+          end = Math.floor(end);
+          const baseRow = {
+            id: r.id ?? crypto.randomUUID(),
+            name: r.name ?? `Activity ${idx + 1}`,
+            category,
+            start,
+            end,
+            type,
+          };
+          if (type === "milestone") {
+            const rawPosition = Number.isFinite(r.milestonePosition)
+              ? r.milestonePosition
+              : Number.isFinite(r.position)
                 ? r.position
                 : start + 0.5;
-              return { ...baseRow, milestonePosition: rawPosition };
+            return { ...baseRow, milestonePosition: rawPosition };
+          }
+          return baseRow;
+        });
+
+        setTimelineMode(j.timelineMode ?? defaults.timelineMode);
+        setDateStart(j.dateStart ?? defaults.dateStart);
+        setDateInterval(j.dateInterval ?? defaults.dateInterval);
+        setPeriodPrefix(j.periodPrefix ?? defaults.periodPrefix);
+        setPeriodStartIndex(j.periodStartIndex ?? defaults.periodStartIndex);
+        setPeriodCount(j.periodCount ?? defaults.periodCount);
+        setLabelColWidth(j.labelColWidth ?? defaults.labelColWidth);
+        setRowHeight(j.rowHeight ?? defaults.rowHeight);
+        setColWidth(j.colWidth ?? defaults.colWidth);
+        setCategories(fallbackCategories);
+        setRows(normalizedRows);
+        setBgStripes(j.bgStripes === undefined ? defaults.bgStripes : Boolean(j.bgStripes));
+      }
+
+      function getCurrentTimelineData() {
+        return {
+          timelineMode,
+          dateStart,
+          dateInterval,
+          periodPrefix,
+          periodStartIndex,
+          periodCount,
+          labelColWidth,
+          rowHeight,
+          colWidth,
+          categories,
+          rows,
+          bgStripes,
+        };
+      }
+
+      function updateSavedCharts(updater) {
+        setSavedCharts((prev) => {
+          const next = updater(prev);
+          const sorted = [...next].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
+          } catch (err) {
+            console.error(err);
+          }
+          return sorted;
+        });
+      }
+
+      function handleSave(options = {}) {
+        const { asCopy = false } = options;
+        let name = currentChartName.trim();
+        if (!name) {
+          const suggested = currentChartName || "Untitled chart";
+          const input = prompt("Give this chart a name:", suggested);
+          if (!input) return;
+          name = input.trim();
+          if (!name) return;
+        }
+        const id = asCopy || !currentChartId ? crypto.randomUUID() : currentChartId;
+        const payload = {
+          id,
+          name,
+          updatedAt: new Date().toISOString(),
+          data: getCurrentTimelineData(),
+        };
+        updateSavedCharts((charts) => {
+          const filtered = charts.filter((item) => item.id !== id);
+          return [...filtered, payload];
+        });
+        setCurrentChartId(id);
+        setCurrentChartName(name);
+        trackEvent("chart_save", {
+          chart_id: id,
+          chart_name: name,
+          is_copy: asCopy,
+          is_new: !currentChartId || asCopy,
+        });
+      }
+
+      function handleSaveAs() {
+        handleSave({ asCopy: true });
+      }
+
+      function deleteSavedChart(id) {
+        const chart = savedCharts.find((c) => c.id === id);
+        if (chart && !confirm(`Delete "${chart.name}"?`)) return;
+        updateSavedCharts((charts) => charts.filter((item) => item.id !== id));
+        if (currentChartId === id) {
+          setCurrentChartId(null);
+        }
+        trackEvent("chart_delete_saved", { chart_id: id, chart_name: chart?.name });
+      }
+
+      function loadChart(chart) {
+        if (!chart || !chart.data) return;
+        applyData(chart.data);
+        setCurrentChartId(chart.id);
+        setCurrentChartName(chart.name ?? "");
+        setShowLoadModal(false);
+        trackEvent("chart_load", { chart_id: chart.id, chart_name: chart.name });
+      }
+
+      function startNewChart() {
+        const defaults = createDefaultTimeline();
+        applyData(defaults);
+        setCurrentChartId(null);
+        setCurrentChartName("");
+        setShowLoadModal(false);
+        trackEvent("chart_create_new");
+      }
+
+      function formatUpdatedAt(iso) {
+        if (!iso) return "";
+        const date = new Date(iso);
+        return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
+      }
+
+      function exportJSON() {
+        const data = getCurrentTimelineData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const baseName = currentChartName.trim() || "timeline";
+        const safeName = baseName
+          .replace(/[^a-z0-9\-_.\s]/gi, "")
+          .trim()
+          .replace(/\s+/g, "-")
+          .toLowerCase() || "timeline";
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${safeName}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        trackEvent("chart_export_json", { chart_id: currentChartId, chart_name: currentChartName.trim() || "" });
+      }
+
+      function importJSON(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const j = JSON.parse(String(reader.result));
+            applyData(j);
+            trackEvent("chart_import_json", { file_name: file.name });
+          } catch (err) {
+            alert("Arquivo inválido");
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      useEffect(() => {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          let list = [];
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              list = parsed
+                .filter((item) => item && typeof item === "object")
+                .map((item, idx) => {
+                  const data = item.data && typeof item.data === "object" ? item.data : item;
+                  return {
+                    id: item.id ?? crypto.randomUUID(),
+                    name: item.name ?? `Saved chart ${idx + 1}`,
+                    updatedAt: item.updatedAt ?? new Date().toISOString(),
+                    data,
+                  };
+                })
+                .filter((item) => item.data && typeof item.data === "object");
             }
-            return baseRow;
-          });
-
-          setTimelineMode(j.timelineMode ?? defaults.timelineMode);
-          setDateStart(j.dateStart ?? defaults.dateStart);
-          setDateInterval(j.dateInterval ?? defaults.dateInterval);
-          setPeriodPrefix(j.periodPrefix ?? defaults.periodPrefix);
-          setPeriodStartIndex(j.periodStartIndex ?? defaults.periodStartIndex);
-          setPeriodCount(j.periodCount ?? defaults.periodCount);
-          setLabelColWidth(j.labelColWidth ?? defaults.labelColWidth);
-          setRowHeight(j.rowHeight ?? defaults.rowHeight);
-          setColWidth(j.colWidth ?? defaults.colWidth);
-          setCategories(fallbackCategories);
-          setRows(normalizedRows);
-          setBgStripes(j.bgStripes === undefined ? defaults.bgStripes : Boolean(j.bgStripes));
-        }
-
-        function getCurrentTimelineData() {
-          return {
-            timelineMode,
-            dateStart,
-            dateInterval,
-            periodPrefix,
-            periodStartIndex,
-            periodCount,
-            labelColWidth,
-            rowHeight,
-            colWidth,
-            categories,
-            rows,
-            bgStripes,
-          };
-        }
-
-        function updateSavedCharts(updater) {
-          setSavedCharts((prev) => {
-            const next = updater(prev);
-            const sorted = [...next].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+          }
+          if (!list.length) {
+            const legacy = localStorage.getItem(LEGACY_KEY);
+            if (legacy) {
+              try {
+                const data = JSON.parse(legacy);
+                if (data && typeof data === "object") {
+                  list = [
+                    {
+                      id: crypto.randomUUID(),
+                      name: "Migrated timeline",
+                      updatedAt: new Date().toISOString(),
+                      data,
+                    },
+                  ];
+                }
+              } catch (err) {
+                console.error(err);
+              }
+              localStorage.removeItem(LEGACY_KEY);
+            }
+          }
+          if (list.length) {
+            const sorted = [...list].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+            setSavedCharts(sorted);
+            setShowLoadModal(true);
             try {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
             } catch (err) {
               console.error(err);
             }
-            return sorted;
-          });
-        }
-
-        function handleSave(options = {}) {
-          const { asCopy = false } = options;
-          let name = currentChartName.trim();
-          if (!name) {
-            const suggested = currentChartName || "Untitled chart";
-            const input = prompt("Give this chart a name:", suggested);
-            if (!input) return;
-            name = input.trim();
-            if (!name) return;
-          }
-          const id = asCopy || !currentChartId ? crypto.randomUUID() : currentChartId;
-          const payload = {
-            id,
-            name,
-            updatedAt: new Date().toISOString(),
-            data: getCurrentTimelineData(),
-          };
-          updateSavedCharts((charts) => {
-            const filtered = charts.filter((item) => item.id !== id);
-            return [...filtered, payload];
-          });
-          setCurrentChartId(id);
-          setCurrentChartName(name);
-          trackEvent("chart_save", {
-            chart_id: id,
-            chart_name: name,
-            is_copy: asCopy,
-            is_new: !currentChartId || asCopy,
-          });
-        }
-
-        function handleSaveAs() {
-          handleSave({ asCopy: true });
-        }
-
-        function deleteSavedChart(id) {
-          const chart = savedCharts.find((c) => c.id === id);
-          if (chart && !confirm(`Delete "${chart.name}"?`)) return;
-          updateSavedCharts((charts) => charts.filter((item) => item.id !== id));
-          if (currentChartId === id) {
-            setCurrentChartId(null);
-          }
-          trackEvent("chart_delete_saved", { chart_id: id, chart_name: chart?.name });
-        }
-
-        function loadChart(chart) {
-          if (!chart || !chart.data) return;
-          applyData(chart.data);
-          setCurrentChartId(chart.id);
-          setCurrentChartName(chart.name ?? "");
-          setShowLoadModal(false);
-          trackEvent("chart_load", { chart_id: chart.id, chart_name: chart.name });
-        }
-
-        function startNewChart() {
-          const defaults = createDefaultTimeline();
-          applyData(defaults);
-          setCurrentChartId(null);
-          setCurrentChartName("");
-          setShowLoadModal(false);
-          trackEvent("chart_create_new");
-        }
-
-        function formatUpdatedAt(iso) {
-          if (!iso) return "";
-          const date = new Date(iso);
-          return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
-        }
-
-        function exportJSON() {
-          const data = getCurrentTimelineData();
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-          const url = URL.createObjectURL(blob);
-          const baseName = currentChartName.trim() || "timeline";
-          const safeName = baseName
-            .replace(/[^a-z0-9\-_.\s]/gi, "")
-            .trim()
-            .replace(/\s+/g, "-")
-            .toLowerCase() || "timeline";
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${safeName}.json`;
-          a.click();
-          URL.revokeObjectURL(url);
-          trackEvent("chart_export_json", { chart_id: currentChartId, chart_name: currentChartName.trim() || "" });
-        }
-
-        function importJSON(e) {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            try {
-              const j = JSON.parse(String(reader.result));
-              applyData(j);
-              trackEvent("chart_import_json", { file_name: file.name });
-            } catch (err) {
-              alert("Arquivo inválido");
-            }
-          };
-          reader.readAsText(file);
-        }
-
-        useEffect(() => {
-          try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            let list = [];
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              if (Array.isArray(parsed)) {
-                list = parsed
-                  .filter((item) => item && typeof item === "object")
-                  .map((item, idx) => {
-                    const data = item.data && typeof item.data === "object" ? item.data : item;
-                    return {
-                      id: item.id ?? crypto.randomUUID(),
-                      name: item.name ?? `Saved chart ${idx + 1}`,
-                      updatedAt: item.updatedAt ?? new Date().toISOString(),
-                      data,
-                    };
-                  })
-                  .filter((item) => item.data && typeof item.data === "object");
-              }
-            }
-            if (!list.length) {
-              const legacy = localStorage.getItem(LEGACY_KEY);
-              if (legacy) {
-                try {
-                  const data = JSON.parse(legacy);
-                  if (data && typeof data === "object") {
-                    list = [
-                      {
-                        id: crypto.randomUUID(),
-                        name: "Migrated timeline",
-                        updatedAt: new Date().toISOString(),
-                        data,
-                      },
-                    ];
-                  }
-                } catch (err) {
-                  console.error(err);
-                }
-                localStorage.removeItem(LEGACY_KEY);
-              }
-            }
-            if (list.length) {
-              const sorted = [...list].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
-              setSavedCharts(sorted);
-              setShowLoadModal(true);
-              try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
-              } catch (err) {
-                console.error(err);
-              }
-            } else {
-              startNewChart();
-            }
-          } catch (err) {
-            console.error(err);
+          } else {
             startNewChart();
           }
-        }, []);
+        } catch (err) {
+          console.error(err);
+          startNewChart();
+        }
+      }, []);
 
-        return (
-          <div className="w-full min-h-screen bg-neutral-50 text-neutral-900">
-            <div className="w-full mx-auto px-4 py-6 flex flex-col gap-4">
-              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                <div className="flex flex-col gap-2">
-                  <h1 className="text-2xl font-bold">Project Timeline (Gantt-style) Builder</h1>
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">Chart name</label>
-                    <input
-                      value={currentChartName}
-                      onChange={(e)=>setCurrentChartName(e.target.value)}
-                      onBlur={(e)=>{
-                        trackEvent("chart_name_update", { chart_id: currentChartId, chart_name: e.target.value });
-                      }}
-                      placeholder="Untitled chart"
-                      className="w-full sm:w-72 px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#073a4b]/40"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 justify-end">
-                  <button onClick={()=>handleSave()} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Save</button>
-                  <button onClick={handleSaveAs} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Save as copy</button>
-                  <button
-                    onClick={()=>{
-                      setShowLoadModal(true);
-                      trackEvent("chart_load_modal_open");
+      return (
+        <div className="w-full min-h-screen bg-neutral-50 text-neutral-900">
+          <div className="w-full mx-auto px-4 py-6 flex flex-col gap-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="flex flex-col gap-2">
+                <h1 className="text-2xl font-bold">Project Timeline (Gantt-style) Builder</h1>
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                  <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">Chart name</label>
+                  <input
+                    value={currentChartName}
+                    onChange={(e) => setCurrentChartName(e.target.value)}
+                    onBlur={(e) => {
+                      trackEvent("chart_name_update", { chart_id: currentChartId, chart_name: e.target.value });
                     }}
-                    className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100"
-                  >
-                    Load
-                  </button>
-                  <button onClick={exportJSON} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Export JSON</button>
-                  <label className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100 cursor-pointer flex items-center gap-2">
-                    <Upload className="w-4 h-4"/>
-                    Import JSON
-                    <input type="file" accept="application/json" onChange={importJSON} className="hidden" />
-                  </label>
+                    placeholder="Untitled chart"
+                    className="w-full sm:w-72 px-3 py-2 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#073a4b]/40"
+                  />
                 </div>
               </div>
+              <div className="flex flex-wrap gap-2 justify-end">
+                <button onClick={() => handleSave()} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Save</button>
+                <button onClick={handleSaveAs} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Save as copy</button>
+                <button
+                  onClick={() => {
+                    setShowLoadModal(true);
+                    trackEvent("chart_load_modal_open");
+                  }}
+                  className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100"
+                >
+                  Load
+                </button>
+                <button onClick={exportJSON} className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100">Export JSON</button>
+                <label className="px-3 py-2 rounded-2xl shadow bg-white hover:bg-neutral-100 cursor-pointer flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  Import JSON
+                  <input type="file" accept="application/json" onChange={importJSON} className="hidden" />
+                </label>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-2xl bg-white shadow">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="font-semibold">Timeline settings</h2>
-                      <button
-                        onClick={()=>
-                          setShowSettings((s)=>{
-                            const next = !s;
-                            trackEvent("settings_toggle", { section: "timeline", visible: next });
-                            return next;
-                          })
-                        }
-                        className="p-1 rounded-lg hover:bg-neutral-100"
-                      >
-                        {showSettings ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
-                      </button>
-                    </div>
-                    {showSettings && (
-                    <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-2xl bg-white shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-semibold">Timeline settings</h2>
+                  <button
+                    onClick={() =>
+                      setShowSettings((s) => {
+                        const next = !s;
+                        trackEvent("settings_toggle", { section: "timeline", visible: next });
+                        return next;
+                      })
+                    }
+                    className="p-1 rounded-lg hover:bg-neutral-100"
+                  >
+                    {showSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </div>
+                {showSettings && (
+                  <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-2">
                       <label className="text-sm">Label type</label>
                       <select
                         value={timelineMode}
-                        onChange={(e)=>{
+                        onChange={(e) => {
                           const value = e.target.value;
                           setTimelineMode(value);
                           trackEvent("timeline_mode_change", { mode: value });
@@ -614,7 +616,7 @@
                         min={1}
                         max={36}
                         value={periodCount}
-                        onChange={(e)=>{
+                        onChange={(e) => {
                           const value = Number(e.target.value);
                           setPeriodCount(value);
                           if (Number.isFinite(value)) {
@@ -630,7 +632,7 @@
                           <label className="text-sm">Prefix</label>
                           <input
                             value={periodPrefix}
-                            onChange={(e)=>{
+                            onChange={(e) => {
                               const value = e.target.value;
                               setPeriodPrefix(value);
                               trackEvent("timeline_prefix_change", { value });
@@ -643,7 +645,7 @@
                           <input
                             type="number"
                             value={periodStartIndex}
-                            onChange={(e)=>{
+                            onChange={(e) => {
                               const value = Number(e.target.value);
                               setPeriodStartIndex(value);
                               if (Number.isFinite(value)) {
@@ -661,7 +663,7 @@
                           <input
                             type="date"
                             value={dateStart}
-                            onChange={(e)=>{
+                            onChange={(e) => {
                               const value = e.target.value;
                               setDateStart(value);
                               trackEvent("timeline_start_date_change", { value });
@@ -673,7 +675,7 @@
                           <label className="text-sm">Interval</label>
                           <select
                             value={dateInterval}
-                            onChange={(e)=>{
+                            onChange={(e) => {
                               const value = e.target.value;
                               setDateInterval(value);
                               trackEvent("timeline_interval_change", { value });
@@ -693,7 +695,7 @@
                         min={100}
                         max={600}
                         value={labelColWidth}
-                        onChange={(e)=>{
+                        onChange={(e) => {
                           const value = Number(e.target.value);
                           setLabelColWidth(value);
                           if (Number.isFinite(value)) {
@@ -703,472 +705,545 @@
                         className="w-28 px-2 py-1 border rounded-lg"
                       />
                     </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-sm">Row height (px)</label>
-                        <input
-                          type="number"
-                          min={30}
-                          max={120}
-                          value={rowHeight}
-                          onChange={(e)=>{
-                            const value = Number(e.target.value);
-                            setRowHeight(value);
-                            if (Number.isFinite(value)) {
-                              trackEvent("timeline_row_height_change", { value });
-                            }
-                          }}
-                          className="w-28 px-2 py-1 border rounded-lg"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-sm">Column min width (px)</label>
-                        <input
-                          type="number"
-                          min={30}
-                          max={400}
-                          value={colWidth}
-                          onChange={(e)=>{
-                            const value = Number(e.target.value);
-                            setColWidth(value);
-                            if (Number.isFinite(value)) {
-                              trackEvent("timeline_column_width_change", { value });
-                            }
-                          }}
-                          className="w-28 px-2 py-1 border rounded-lg"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          id="bgstripes"
-                          type="checkbox"
-                          checked={bgStripes}
-                          onChange={(e)=>{
-                            const checked = e.target.checked;
-                            setBgStripes(checked);
-                            trackEvent("timeline_toggle_bg_stripes", { enabled: checked });
-                          }}
-                        />
-                        <label htmlFor="bgstripes" className="text-sm">Alternate row stripes</label>
-                      </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm">Row height (px)</label>
+                      <input
+                        type="number"
+                        min={30}
+                        max={120}
+                        value={rowHeight}
+                        onChange={(e) => {
+                          const value = Number(e.target.value);
+                          setRowHeight(value);
+                          if (Number.isFinite(value)) {
+                            trackEvent("timeline_row_height_change", { value });
+                          }
+                        }}
+                        className="w-28 px-2 py-1 border rounded-lg"
+                      />
                     </div>
-                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-sm">Column min width (px)</label>
+                      <input
+                        type="number"
+                        min={30}
+                        max={400}
+                        value={colWidth}
+                        onChange={(e) => {
+                          const value = Number(e.target.value);
+                          setColWidth(value);
+                          if (Number.isFinite(value)) {
+                            trackEvent("timeline_column_width_change", { value });
+                          }
+                        }}
+                        className="w-28 px-2 py-1 border rounded-lg"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="bgstripes"
+                        type="checkbox"
+                        checked={bgStripes}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setBgStripes(checked);
+                          trackEvent("timeline_toggle_bg_stripes", { enabled: checked });
+                        }}
+                      />
+                      <label htmlFor="bgstripes" className="text-sm">Alternate row stripes</label>
+                    </div>
                   </div>
+                )}
+              </div>
 
-                  <div className="p-4 rounded-2xl bg-white shadow md:col-span-2">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="font-semibold">Categories</h2>
-                      <button
-                        onClick={()=>
-                          setShowCategories((s)=>{
-                            const next = !s;
-                            trackEvent("settings_toggle", { section: "categories", visible: next });
-                            return next;
-                          })
-                        }
-                        className="p-1 rounded-lg hover:bg-neutral-100"
-                      >
-                        {showCategories ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
-                      </button>
-                    </div>
-                    {showCategories && (
-                    <>
-                      <div className="flex flex-wrap gap-2 items-center mb-3">
+              <div className="p-4 rounded-2xl bg-white shadow md:col-span-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-semibold">Categories</h2>
+                  <button
+                    onClick={() =>
+                      setShowCategories((s) => {
+                        const next = !s;
+                        trackEvent("settings_toggle", { section: "categories", visible: next });
+                        return next;
+                      })
+                    }
+                    className="p-1 rounded-lg hover:bg-neutral-100"
+                  >
+                    {showCategories ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </div>
+                {showCategories && (
+                  <>
+                    <div className="flex flex-wrap gap-2 items-center mb-3">
                       {categories.map((c) => (
                         <div key={c.id} className="flex items-center gap-2 bg-neutral-100 rounded-xl px-2 py-1">
                           <input
                             className="w-36 px-2 py-1 text-sm border rounded-lg"
                             value={c.name}
-                            onChange={(e)=>{
+                            onChange={(e) => {
                               const val = e.target.value;
-                              setCategories((arr)=>arr.map(x=>x.id===c.id?{...x,name:val}:x));
+                              setCategories((arr) => arr.map(x => x.id === c.id ? { ...x, name: val } : x));
                             }}
-                            onBlur={(e)=>{
+                            onBlur={(e) => {
                               trackEvent("category_name_change", { category_id: c.id, category_name: e.target.value });
                             }}
                           />
                           <input
                             type="color"
                             value={c.color}
-                            onChange={(e)=>{
+                            onChange={(e) => {
                               const val = e.target.value;
-                              setCategories((arr)=>arr.map(x=>x.id===c.id?{...x,color:val}:x));
+                              setCategories((arr) => arr.map(x => x.id === c.id ? { ...x, color: val } : x));
                               trackEvent("category_color_change", { category_id: c.id, color: val });
                             }}
                           />
                           <button
                             className="p-1 rounded-lg hover:bg-red-50 text-red-600"
                             title="Remove category"
-                            onClick={()=>removeCategory(c.id)}
-                            disabled={categories.length<=1}
+                            onClick={() => removeCategory(c.id)}
+                            disabled={categories.length <= 1}
                           >
-                            <Trash2 className="w-4 h-4"/>
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       ))}
-                      <button onClick={addCategory} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4"/> Add category</button>
+                      <button onClick={addCategory} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4" /> Add category</button>
+                    </div>
+                    <div className="text-xs text-neutral-600">Tip: edit names/colors. You can delete categories; items using it are reassigned to the first category.</div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white shadow overflow-x-auto">
+              <div className="w-full">
+                <div className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => addRowAt()} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4" /> Add activity</button>
+                    <button onClick={() => addMilestoneAt()} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4" /> Add milestone</button>
+                  </div>
+                  <span className="text-xs text-neutral-500">Arraste para mover/redimensionar. Clique direito para trocar a categoria. <b>Duplo clique</b> no rótulo ou na barra para excluir.</span>
+                </div>
+                <div ref={gridRef} className="px-6 pb-6">
+                  <TimelinePreview
+                    rows={rows}
+                    setRows={setRows}
+                    categories={categories}
+                    labels={periodLabels}
+                    labelColWidth={labelColWidth}
+                    rowHeight={rowHeight}
+                    bgStripes={bgStripes}
+                    onAddRowAt={addRowAt}
+                    onAddMilestoneAt={addMilestoneAt}
+                    onRemoveRow={removeRow}
+                    columnWidth={colWidth}
+                  />
+                </div>
+                {showLoadModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-black/40">
+                    <div className="relative w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
+                      <div className="mb-4 flex items-center justify-between gap-4">
+                        <h2 className="text-lg font-semibold text-neutral-900">Saved charts</h2>
+                        <button
+                          onClick={() => setShowLoadModal(false)}
+                          className="text-sm font-medium text-neutral-500 hover:text-neutral-700"
+                        >
+                          Close
+                        </button>
                       </div>
-                      <div className="text-xs text-neutral-600">Tip: edit names/colors. You can delete categories; items using it are reassigned to the first category.</div>
-                    </>
+                      {savedCharts.length ? (
+                        <div className="flex max-h-[50vh] flex-col gap-3 overflow-y-auto pr-1">
+                          {savedCharts.map((chart) => {
+                            const updatedAt = formatUpdatedAt(chart.updatedAt);
+                            return (
+                              <div
+                                key={chart.id}
+                                className="flex flex-col gap-3 rounded-2xl border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-neutral-900">{chart.name || "Untitled chart"}</span>
+                                    {chart.id === currentChartId && (
+                                      <span className="rounded-full bg-[#073a4b]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#073a4b]">
+                                        Current
+                                      </span>
+                                    )}
+                                  </div>
+                                  {updatedAt && (
+                                    <span className="text-xs text-neutral-500">Last updated {updatedAt}</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => loadChart(chart)}
+                                    className="rounded-xl bg-[#073a4b] px-3 py-2 text-sm font-medium text-white shadow hover:bg-[#052835]"
+                                  >
+                                    Load
+                                  </button>
+                                  <button
+                                    onClick={() => deleteSavedChart(chart.id)}
+                                    className="flex items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" /> Delete
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
+                          You don't have any saved charts yet. Create a new chart to get started.
+                        </div>
+                      )}
+                      <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <button
+                          onClick={startNewChart}
+                          className="w-full rounded-xl bg-[#3a7d85] px-4 py-2 text-sm font-medium text-white shadow hover:bg-[#2d6066] sm:w-auto"
+                        >
+                          Create new chart
+                        </button>
+                        <button
+                          onClick={() => setShowLoadModal(false)}
+                          className="w-full rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 sm:w-auto"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="text-xs text-neutral-500 pt-4">Para exportar imagem, tire um screenshot da prévia. Você ainda pode Exportar/Importar JSON para salvar e reabrir edições.</div>
+          </div>
+        </div>
+      );
+    }
+
+    function TimelinePreview({ rows, setRows, categories, labels, labelColWidth, rowHeight, bgStripes, onAddRowAt, onAddMilestoneAt, onRemoveRow, columnWidth }) {
+      const cols = labels.length;
+      const gridTemplate = ` ${labelColWidth}px repeat(${cols}, minmax(${columnWidth}px, 1fr))`;
+      const containerRef = useRef(null);
+      const [menu, setMenu] = useState({ open: false, x: 0, y: 0, rowId: null });
+      const [drag, setDrag] = useState(null);
+      const [dragOverIndex, setDragOverIndex] = useState(null);
+      const dragItemRef = useRef(null);
+
+      useEffect(() => {
+        function onMove(e) {
+          if (!drag || !containerRef.current || cols <= 0) return;
+          if (drag.type === "row_reorder") return;
+
+          const rect = containerRef.current.getBoundingClientRect();
+          const usable = rect.width - 0;
+          const x = Math.max(0, Math.min(e.clientX - rect.left, usable));
+          const per = usable / cols;
+          setRows((rs) => rs.map((r) => {
+            if (r.id !== drag.rowId) return r;
+            if (drag.type === "move") {
+              if (r.type === "milestone") {
+                const startPosition = Number.isFinite(drag.startMilestonePosition)
+                  ? drag.startMilestonePosition
+                  : Number.isFinite(r.milestonePosition)
+                    ? r.milestonePosition
+                    : r.start + 0.5;
+                const minPosition = 0.5;
+                const maxPosition = Math.max(minPosition, cols - 0.5);
+                let nextPosition = startPosition + (x - drag.startX) / per;
+                nextPosition = Math.min(maxPosition, Math.max(minPosition, nextPosition));
+                const snapped = Math.round(nextPosition * 2) / 2;
+                const nextStart = Math.min(cols - 1, Math.max(0, Math.floor(snapped)));
+                if (r.start === nextStart && r.end === nextStart && r.milestonePosition === snapped) {
+                  return r;
+                }
+                return { ...r, start: nextStart, end: nextStart, milestonePosition: snapped };
+              }
+              const deltaCols = Math.round((x - drag.startX) / per);
+              let ns = Math.max(0, Math.min(drag.startStart + deltaCols, cols - 1));
+              let ne = ns + (drag.startEnd - drag.startStart);
+              if (ne > cols - 1) { ne = cols - 1; ns = ne - (drag.startEnd - drag.startStart); }
+              return { ...r, start: ns, end: ne };
+            }
+            if (drag.type === "left") {
+              const deltaCols = Math.round((x - drag.startX) / per);
+              let ns = Math.max(0, Math.min(drag.startStart + deltaCols, r.end));
+              return { ...r, start: Math.min(ns, r.end) };
+            }
+            if (drag.type === "right") {
+              const deltaCols = Math.round((x - drag.startX) / per);
+              let ne = Math.max(r.start, Math.min(drag.startEnd + deltaCols, cols - 1));
+              return { ...r, end: Math.max(ne, r.start) };
+            }
+            return r;
+          }));
+        }
+        function onUp() { setDrag(null); }
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+      }, [drag, cols, setRows]);
+
+      function handleRowDragStart(e, index) {
+        dragItemRef.current = index;
+        e.dataTransfer.effectAllowed = "move";
+      }
+
+      function handleRowDragEnter(e, index) {
+        if (dragItemRef.current === null || dragItemRef.current === index) return;
+        setDragOverIndex(index);
+      }
+
+      function handleRowDragEnd() {
+        dragItemRef.current = null;
+        setDragOverIndex(null);
+      }
+
+      function handleRowDrop(e, index) {
+        e.preventDefault();
+        const sourceIndex = dragItemRef.current;
+        if (sourceIndex === null || sourceIndex === index) return;
+
+        setRows((prevRows) => {
+          const newRows = [...prevRows];
+          const [movedRow] = newRows.splice(sourceIndex, 1);
+          newRows.splice(index, 0, movedRow);
+          return newRows;
+        });
+        dragItemRef.current = null;
+        setDragOverIndex(null);
+        trackEvent("activity_reorder", { from_index: sourceIndex, to_index: index });
+      }
+
+      function toggleActivityType(rowId) {
+        setRows(prev => prev.map(r => {
+          if (r.id !== rowId) return r;
+          if (r.type === 'milestone') {
+            return { ...r, type: 'task', end: r.start, milestonePosition: undefined };
+          } else {
+            return { ...r, type: 'milestone', end: r.start, milestonePosition: r.start + 0.5 };
+          }
+        }));
+        trackEvent("activity_type_change", { row_id: rowId });
+      }
+
+      return (
+        <div className="w-full" onContextMenu={(e) => e.preventDefault()}>
+          <div className="grid" style={{ gridTemplateColumns: gridTemplate }}>
+            <div></div>
+            {labels.map((label, idx) => (
+              <div key={label.id ?? idx} className="relative flex items-center justify-center">
+                <div className="bg-[#073a4b] text-white px-3 py-1 rounded-b-xl text-sm font-semibold shadow">{label.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-2 flex flex-col">
+            {rows.map((r, idx) => {
+              const cat = categories.find((c) => c.id === r.category) || categories[0];
+              const safeStartIndex = cols > 0 ? Math.min(cols - 1, Math.max(0, Math.round(Number.isFinite(r.start) ? r.start : 0))) : 0;
+              const safeEndIndex = cols > 0 ? Math.min(cols - 1, Math.max(0, Math.round(Number.isFinite(r.end) ? r.end : safeStartIndex))) : safeStartIndex;
+              const startLabel = labels[safeStartIndex]?.label;
+              const endLabel = labels[safeEndIndex]?.label;
+              const milestonePositionRaw = r.type === "milestone"
+                ? Number.isFinite(r.milestonePosition)
+                  ? r.milestonePosition
+                  : (Number.isFinite(r.start) ? r.start : 0) + 0.5
+                : null;
+              const milestonePosition = r.type === "milestone" && cols > 0
+                ? Math.min(cols - 0.5, Math.max(0.5, Math.round(milestonePositionRaw * 2) / 2))
+                : milestonePositionRaw;
+              let milestoneLabel = "";
+              if (r.type === "milestone" && cols > 0 && milestonePosition !== null) {
+                const isBetween = Math.abs(milestonePosition - Math.round(milestonePosition)) < 1e-6;
+                if (isBetween) {
+                  const rightIndex = Math.min(cols - 1, Math.max(0, Math.round(milestonePosition)));
+                  const leftIndex = Math.max(0, Math.min(cols - 1, rightIndex - 1));
+                  const leftLabel = labels[leftIndex]?.label;
+                  const rightLabel = labels[rightIndex]?.label;
+                  if (leftLabel && rightLabel && leftLabel !== rightLabel) {
+                    milestoneLabel = `${leftLabel} → ${rightLabel}`;
+                  } else {
+                    milestoneLabel = leftLabel || rightLabel || "";
+                  }
+                } else {
+                  const centerIndex = Math.min(cols - 1, Math.max(0, Math.floor(milestonePosition)));
+                  milestoneLabel = labels[centerIndex]?.label || "";
+                }
+              }
+              const milestoneTitle = milestoneLabel ? `${r.name} • ${milestoneLabel}` : r.name;
+
+              return (
+                <div
+                  key={r.id}
+                  className={`grid relative transition-colors ${dragOverIndex === idx ? "border-t-2 border-[#073a4b]" : ""}`}
+                  style={{ gridTemplateColumns: gridTemplate, opacity: dragItemRef.current === idx ? 0.5 : 1 }}
+                  draggable
+                  onDragStart={(e) => handleRowDragStart(e, idx)}
+                  onDragEnter={(e) => handleRowDragEnter(e, idx)}
+                  onDragEnd={handleRowDragEnd}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => handleRowDrop(e, idx)}
+                >
+                  <div
+                    className={`flex items-center pl-2 pr-3 text-sm font-medium ${bgStripes && idx % 2 === 1 ? "bg-neutral-100" : "bg-neutral-200"}`}
+                    style={{ height: rowHeight }}
+                    onDoubleClick={() => {
+                      if (confirm('Delete this activity?')) onRemoveRow(r.id);
+                    }}
+                  >
+                    <div className="cursor-grab active:cursor-grabbing p-1 text-neutral-400 hover:text-neutral-600 mr-1" onMouseDown={e => e.stopPropagation()}>
+                      <GripVertical className="w-4 h-4" />
+                    </div>
+                    <span className="flex-1 truncate" contentEditable suppressContentEditableWarning onBlur={(e) => {
+                      const name = e.currentTarget.textContent || "";
+                      if (name !== r.name) {
+                        trackEvent("activity_rename", { row_id: r.id, row_type: r.type, name });
+                      }
+                      setRows((rs) => rs.map((x) => x.id === r.id ? { ...x, name } : x));
+                    }}>{r.name}</span>
+                  </div>
+
+                  {Array.from({ length: cols }, (_, ci) => (
+                    <div key={ci} className={`${bgStripes && idx % 2 === 1 ? "bg-neutral-50" : "bg-neutral-100"} relative`} style={{ height: rowHeight }}>
+                      <div className="absolute right-0 top-0 h-full border-r border-dashed border-neutral-300" />
+                    </div>
+                  ))}
+
+                  <div className="col-start-2 col-end-[-1] relative" style={{ height: 0 }}>
+                    <div
+                      ref={idx === 0 ? containerRef : null}
+                      className="absolute left-0 top-[-1px] h-[1px] w-full"
+                    />
+                    {r.type === "milestone" ? (
+                      <div
+                        className="absolute group cursor-grab active:cursor-grabbing"
+                        onMouseDown={(e) => {
+                          e.stopPropagation(); // Prevent row drag
+                          const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                          setDrag({
+                            rowId: r.id,
+                            type: "move",
+                            startX: e.clientX - rect.left,
+                            startStart: r.start,
+                            startEnd: r.end,
+                            startMilestonePosition: (milestonePosition ?? ((Number.isFinite(r.start) ? r.start : 0) + 0.5)),
+                          });
+                          trackEvent("activity_drag_start", { row_id: r.id, row_type: r.type, interaction: "move" });
+                        }}
+                        onDoubleClick={() => { if (confirm('Delete this activity?')) onRemoveRow(r.id); }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setMenu({ open: true, x: e.clientX, y: e.clientY, rowId: r.id });
+                          trackEvent("activity_context_menu_open", { row_id: r.id, row_type: r.type });
+                        }}
+                        style={{
+                          left: `calc((100% / ${cols}) * ${milestonePosition ?? ((Number.isFinite(r.start) ? r.start : 0) + 0.5)})`,
+                          top: -rowHeight + rowHeight * 0.15,
+                          width: rowHeight * 0.7,
+                          height: rowHeight * 0.7,
+                          background: cat.color,
+                          transform: "translate(-50%, 0) rotate(45deg)",
+                          boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+                        }}
+                        title={milestoneTitle}
+                      />
+                    ) : (
+                      <div
+                        className="absolute group cursor-grab active:cursor-grabbing"
+                        onMouseDown={(e) => {
+                          e.stopPropagation(); // Prevent row drag
+                          const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                          setDrag({ rowId: r.id, type: "move", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
+                          trackEvent("activity_drag_start", { row_id: r.id, row_type: r.type, interaction: "move" });
+                        }}
+                        onDoubleClick={() => { if (confirm('Delete this activity?')) onRemoveRow(r.id); }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setMenu({ open: true, x: e.clientX, y: e.clientY, rowId: r.id });
+                          trackEvent("activity_context_menu_open", { row_id: r.id, row_type: r.type });
+                        }}
+                        style={{
+                          left: `calc((100% / ${cols}) * ${r.start})`,
+                          width: `calc((100% / ${cols}) * ${r.end - r.start + 1})`,
+                          top: -rowHeight + rowHeight * 0.15,
+                          height: rowHeight * 0.7,
+                          background: cat.color,
+                          borderRadius: 9999,
+                          boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+                        }}
+                        title={`${r.name}${startLabel ? ` • ${startLabel}` : ""}${endLabel && endLabel !== startLabel ? ` → ${endLabel}` : ""}`}
+                      >
+                        <div
+                          className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-l-full"
+                          onMouseDown={(e) => {
+                            const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
+                            setDrag({ rowId: r.id, type: "left", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
+                            e.stopPropagation();
+                            trackEvent("activity_resize_start", { row_id: r.id, row_type: r.type, edge: "start" });
+                          }}
+                        />
+                        <div
+                          className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-r-full"
+                          onMouseDown={(e) => {
+                            const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
+                            setDrag({ rowId: r.id, type: "right", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
+                            e.stopPropagation();
+                            trackEvent("activity_resize_start", { row_id: r.id, row_type: r.type, edge: "end" });
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
-
-                <div className="rounded-2xl bg-white shadow overflow-x-auto">
-                  <div className="w-full">
-                  <div className="p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <button onClick={()=>addRowAt()} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4"/> Add activity</button>
-                      <button onClick={()=>addMilestoneAt()} className="px-3 py-2 rounded-xl bg-white shadow hover:bg-neutral-100 flex items-center gap-2"><Plus className="w-4 h-4"/> Add milestone</button>
-                    </div>
-                    <span className="text-xs text-neutral-500">Arraste para mover/redimensionar. Clique direito para trocar a categoria. <b>Duplo clique</b> no rótulo ou na barra para excluir.</span>
-                  </div>
-                  <div ref={gridRef} className="px-6 pb-6">
-                      <TimelinePreview
-                        rows={rows}
-                        setRows={setRows}
-                        categories={categories}
-                        labels={periodLabels}
-                        labelColWidth={labelColWidth}
-                        rowHeight={rowHeight}
-                        bgStripes={bgStripes}
-                        onAddRowAt={addRowAt}
-                        onAddMilestoneAt={addMilestoneAt}
-                        onRemoveRow={removeRow}
-                        columnWidth={colWidth}
-                      />
-            </div>
-            {showLoadModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-black/40">
-                <div className="relative w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
-                  <div className="mb-4 flex items-center justify-between gap-4">
-                    <h2 className="text-lg font-semibold text-neutral-900">Saved charts</h2>
-                    <button
-                      onClick={()=>setShowLoadModal(false)}
-                      className="text-sm font-medium text-neutral-500 hover:text-neutral-700"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  {savedCharts.length ? (
-                    <div className="flex max-h-[50vh] flex-col gap-3 overflow-y-auto pr-1">
-                      {savedCharts.map((chart) => {
-                        const updatedAt = formatUpdatedAt(chart.updatedAt);
-                        return (
-                          <div
-                            key={chart.id}
-                            className="flex flex-col gap-3 rounded-2xl border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-neutral-900">{chart.name || "Untitled chart"}</span>
-                                {chart.id === currentChartId && (
-                                  <span className="rounded-full bg-[#073a4b]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#073a4b]">
-                                    Current
-                                  </span>
-                                )}
-                              </div>
-                              {updatedAt && (
-                                <span className="text-xs text-neutral-500">Last updated {updatedAt}</span>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={()=>loadChart(chart)}
-                                className="rounded-xl bg-[#073a4b] px-3 py-2 text-sm font-medium text-white shadow hover:bg-[#052835]"
-                              >
-                                Load
-                              </button>
-                              <button
-                                onClick={()=>deleteSavedChart(chart.id)}
-                                className="flex items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" /> Delete
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
-                      You don't have any saved charts yet. Create a new chart to get started.
-                    </div>
-                  )}
-                  <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <button
-                      onClick={startNewChart}
-                      className="w-full rounded-xl bg-[#3a7d85] px-4 py-2 text-sm font-medium text-white shadow hover:bg-[#2d6066] sm:w-auto"
-                    >
-                      Create new chart
-                    </button>
-                    <button
-                      onClick={()=>setShowLoadModal(false)}
-                      className="w-full rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 sm:w-auto"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })}
           </div>
-        </div>
 
-              <div className="text-xs text-neutral-500 pt-4">Para exportar imagem, tire um screenshot da prévia. Você ainda pode Exportar/Importar JSON para salvar e reabrir edições.</div>
-            </div>
-          </div>
-        );
-      }
-
-        function TimelinePreview({ rows, setRows, categories, labels, labelColWidth, rowHeight, bgStripes, onAddRowAt, onAddMilestoneAt, onRemoveRow, columnWidth }) {
-          const cols = labels.length;
-          const gridTemplate = ` ${labelColWidth}px repeat(${cols}, minmax(${columnWidth}px, 1fr))`;
-        const containerRef = useRef(null);
-        const [menu, setMenu] = useState({ open:false, x:0, y:0, rowId:null });
-        const [drag, setDrag] = useState(null);
-
-        useEffect(()=>{
-          function onMove(e){
-            if(!drag || !containerRef.current || cols <= 0) return;
-            const rect = containerRef.current.getBoundingClientRect();
-            const usable = rect.width - 0;
-            const x = Math.max(0, Math.min(e.clientX - rect.left, usable));
-            const per = usable / cols;
-            setRows((rs)=>rs.map((r)=>{
-              if(r.id !== drag.rowId) return r;
-              if(drag.type === "move"){
-                if(r.type === "milestone"){
-                  const startPosition = Number.isFinite(drag.startMilestonePosition)
-                    ? drag.startMilestonePosition
-                    : Number.isFinite(r.milestonePosition)
-                    ? r.milestonePosition
-                    : r.start + 0.5;
-                  const minPosition = 0.5;
-                  const maxPosition = Math.max(minPosition, cols - 0.5);
-                  let nextPosition = startPosition + (x - drag.startX) / per;
-                  nextPosition = Math.min(maxPosition, Math.max(minPosition, nextPosition));
-                  const snapped = Math.round(nextPosition * 2) / 2;
-                  const nextStart = Math.min(cols - 1, Math.max(0, Math.floor(snapped)));
-                  if(r.start === nextStart && r.end === nextStart && r.milestonePosition === snapped){
-                    return r;
-                  }
-                  return { ...r, start: nextStart, end: nextStart, milestonePosition: snapped };
-                }
-                const deltaCols = Math.round((x - drag.startX) / per);
-                let ns = Math.max(0, Math.min(drag.startStart + deltaCols, cols-1));
-                let ne = ns + (drag.startEnd - drag.startStart);
-                if(ne > cols-1){ ne = cols-1; ns = ne - (drag.startEnd - drag.startStart); }
-                return { ...r, start: ns, end: ne };
-              }
-              if(drag.type === "left"){
-                const deltaCols = Math.round((x - drag.startX) / per);
-                let ns = Math.max(0, Math.min(drag.startStart + deltaCols, r.end));
-                return { ...r, start: Math.min(ns, r.end) };
-              }
-              if(drag.type === "right"){
-                const deltaCols = Math.round((x - drag.startX) / per);
-                let ne = Math.max(r.start, Math.min(drag.startEnd + deltaCols, cols-1));
-                return { ...r, end: Math.max(ne, r.start) };
-              }
-              return r;
-            }));
-          }
-          function onUp(){ setDrag(null); }
-          window.addEventListener('mousemove', onMove);
-          window.addEventListener('mouseup', onUp);
-          return ()=>{ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-        }, [drag, cols, setRows]);
-
-        return (
-          <div className="w-full" onContextMenu={(e)=>e.preventDefault()}>
-            <div className="grid" style={{ gridTemplateColumns: gridTemplate }}>
-              <div></div>
-              {labels.map((label, idx) => (
-                <div key={label.id ?? idx} className="relative flex items-center justify-center">
-                  <div className="bg-[#073a4b] text-white px-3 py-1 rounded-b-xl text-sm font-semibold shadow">{label.label}</div>
-                </div>
+          {menu.open && (
+            <div
+              className="fixed z-50 bg-white border shadow-lg rounded-xl p-2 text-sm min-w-[220px]"
+              style={{ left: menu.x + 2, top: menu.y + 2 }}
+              onMouseLeave={() => setMenu({ open: false, x: 0, y: 0, rowId: null })}
+            >
+              <div className="px-2 py-1 text-xs text-neutral-500">Set category</div>
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    const targetRowId = menu.rowId;
+                    setRows((rs) => rs.map((r) => r.id === targetRowId ? { ...r, category: c.id } : r));
+                    setMenu({ open: false, x: 0, y: 0, rowId: null });
+                    trackEvent("activity_change_category", { row_id: targetRowId, category_id: c.id });
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-neutral-100"
+                >
+                  <span className="inline-block w-3 h-3 rounded-full" style={{ background: c.color }} /> {c.name}
+                </button>
               ))}
+              <div className="h-px my-1 bg-neutral-200" />
+              <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left" onClick={() => {
+                toggleActivityType(menu.rowId);
+                setMenu({ open: false, x: 0, y: 0, rowId: null });
+              }}>
+                {rows.find(x => x.id === menu.rowId)?.type === 'milestone' ? 'Convert to Activity' : 'Convert to Milestone'}
+              </button>
+              <div className="h-px my-1 bg-neutral-200" />
+              <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left" onClick={() => { onAddRowAt(rows.findIndex(r => r.id === menu.rowId) + 1); setMenu({ open: false, x: 0, y: 0, rowId: null }); }}>Add activity below</button>
+              <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left" onClick={() => { onAddMilestoneAt(rows.findIndex(r => r.id === menu.rowId) + 1); setMenu({ open: false, x: 0, y: 0, rowId: null }); }}>Add milestone below</button>
+              <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left text-red-600" onClick={() => { onRemoveRow(menu.rowId); setMenu({ open: false, x: 0, y: 0, rowId: null }); }}>Delete activity</button>
             </div>
+          )}
+        </div>
+      );
+    }
 
-            <div className="mt-2 grid" style={{ gridTemplateColumns: gridTemplate }}>
-              {rows.map((r, idx) => {
-                const cat = categories.find((c)=>c.id===r.category) || categories[0];
-                const safeStartIndex = cols > 0 ? Math.min(cols - 1, Math.max(0, Math.round(Number.isFinite(r.start) ? r.start : 0))) : 0;
-                const safeEndIndex = cols > 0 ? Math.min(cols - 1, Math.max(0, Math.round(Number.isFinite(r.end) ? r.end : safeStartIndex))) : safeStartIndex;
-                const startLabel = labels[safeStartIndex]?.label;
-                const endLabel = labels[safeEndIndex]?.label;
-                const milestonePositionRaw = r.type === "milestone"
-                  ? Number.isFinite(r.milestonePosition)
-                    ? r.milestonePosition
-                    : (Number.isFinite(r.start) ? r.start : 0) + 0.5
-                  : null;
-                const milestonePosition = r.type === "milestone" && cols > 0
-                  ? Math.min(cols - 0.5, Math.max(0.5, Math.round(milestonePositionRaw * 2) / 2))
-                  : milestonePositionRaw;
-                let milestoneLabel = "";
-                if (r.type === "milestone" && cols > 0 && milestonePosition !== null) {
-                  const isBetween = Math.abs(milestonePosition - Math.round(milestonePosition)) < 1e-6;
-                  if (isBetween) {
-                    const rightIndex = Math.min(cols - 1, Math.max(0, Math.round(milestonePosition)));
-                    const leftIndex = Math.max(0, Math.min(cols - 1, rightIndex - 1));
-                    const leftLabel = labels[leftIndex]?.label;
-                    const rightLabel = labels[rightIndex]?.label;
-                    if (leftLabel && rightLabel && leftLabel !== rightLabel) {
-                      milestoneLabel = `${leftLabel} → ${rightLabel}`;
-                    } else {
-                      milestoneLabel = leftLabel || rightLabel || "";
-                    }
-                  } else {
-                    const centerIndex = Math.min(cols - 1, Math.max(0, Math.floor(milestonePosition)));
-                    milestoneLabel = labels[centerIndex]?.label || "";
-                  }
-                }
-                const milestoneTitle = milestoneLabel ? `${r.name} • ${milestoneLabel}` : r.name;
-                return (
-                  <React.Fragment key={r.id}>
-                    <div
-                      className={`flex items-center pl-4 pr-3 text-sm font-medium ${bgStripes && idx % 2 === 1 ? "bg-neutral-100" : "bg-neutral-200"}`}
-                      style={{ height: rowHeight }}
-                      onDoubleClick={()=>{
-                        if(confirm('Delete this activity?')) onRemoveRow(r.id);
-                      }}
-                    >
-                      <span contentEditable suppressContentEditableWarning onBlur={(e)=>{
-                        const name = e.currentTarget.textContent || "";
-                        if(name !== r.name){
-                          trackEvent("activity_rename", { row_id: r.id, row_type: r.type, name });
-                        }
-                        setRows((rs)=>rs.map((x)=>x.id===r.id?{...x,name}:x));
-                      }}>{r.name}</span>
-                    </div>
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<TimelineBuilder />);
+  </script>
+</body>
 
-                    {Array.from({ length: cols }, (_, ci) => (
-                      <div key={ci} className={`${bgStripes && idx % 2 === 1 ? "bg-neutral-50" : "bg-neutral-100"} relative`} style={{ height: rowHeight }}>
-                        <div className="absolute right-0 top-0 h-full border-r border-dashed border-neutral-300" />
-                      </div>
-                    ))}
-
-                    <div className="col-start-2 col-end-[-1] relative" style={{ height: 0 }}>
-                      <div
-                        ref={idx===0?containerRef:null}
-                        className="absolute left-0 top-[-1px] h-[1px] w-full"
-                      />
-                      {r.type === "milestone" ? (
-                        <div
-                          className="absolute group cursor-grab active:cursor-grabbing"
-                          onMouseDown={(e)=>{
-                            const rect = e.currentTarget.parentElement.getBoundingClientRect();
-                            setDrag({
-                              rowId:r.id,
-                              type:"move",
-                              startX: e.clientX - rect.left,
-                              startStart: r.start,
-                              startEnd: r.end,
-                              startMilestonePosition: (milestonePosition ?? ((Number.isFinite(r.start) ? r.start : 0) + 0.5)),
-                            });
-                            trackEvent("activity_drag_start", { row_id: r.id, row_type: r.type, interaction: "move" });
-                          }}
-                          onDoubleClick={()=>{ if(confirm('Delete this activity?')) onRemoveRow(r.id); }}
-                          onContextMenu={(e)=>{
-                            e.preventDefault();
-                            setMenu({ open:true, x:e.clientX, y:e.clientY, rowId:r.id });
-                            trackEvent("activity_context_menu_open", { row_id: r.id, row_type: r.type });
-                          }}
-                          style={{
-                            left: `calc((100% / ${cols}) * ${milestonePosition ?? ((Number.isFinite(r.start) ? r.start : 0) + 0.5)})`,
-                            top: -rowHeight + rowHeight * 0.15,
-                            width: rowHeight * 0.7,
-                            height: rowHeight * 0.7,
-                            background: cat.color,
-                            transform: "translate(-50%, 0) rotate(45deg)",
-                            boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
-                          }}
-                          title={milestoneTitle}
-                        />
-                      ) : (
-                        <div
-                          className="absolute group cursor-grab active:cursor-grabbing"
-                          onMouseDown={(e)=>{
-                            const rect = e.currentTarget.parentElement.getBoundingClientRect();
-                            setDrag({ rowId:r.id, type:"move", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
-                            trackEvent("activity_drag_start", { row_id: r.id, row_type: r.type, interaction: "move" });
-                          }}
-                          onDoubleClick={()=>{ if(confirm('Delete this activity?')) onRemoveRow(r.id); }}
-                          onContextMenu={(e)=>{
-                            e.preventDefault();
-                            setMenu({ open:true, x:e.clientX, y:e.clientY, rowId:r.id });
-                            trackEvent("activity_context_menu_open", { row_id: r.id, row_type: r.type });
-                          }}
-                          style={{
-                            left: `calc((100% / ${cols}) * ${r.start})`,
-                            width: `calc((100% / ${cols}) * ${r.end - r.start + 1})`,
-                            top: -rowHeight + rowHeight * 0.15,
-                            height: rowHeight * 0.7,
-                            background: cat.color,
-                            borderRadius: 9999,
-                            boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
-                          }}
-                          title={`${r.name}${startLabel ? ` • ${startLabel}` : ""}${endLabel && endLabel !== startLabel ? ` → ${endLabel}` : ""}`}
-                        >
-                          <div
-                            className="absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-l-full"
-                            onMouseDown={(e)=>{
-                              const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
-                              setDrag({ rowId:r.id, type:"left", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
-                              e.stopPropagation();
-                              trackEvent("activity_resize_start", { row_id: r.id, row_type: r.type, edge: "start" });
-                            }}
-                          />
-                          <div
-                            className="absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-black/0 hover:bg-black/10 rounded-r-full"
-                            onMouseDown={(e)=>{
-                              const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
-                              setDrag({ rowId:r.id, type:"right", startX: e.clientX - rect.left, startStart: r.start, startEnd: r.end });
-                              e.stopPropagation();
-                              trackEvent("activity_resize_start", { row_id: r.id, row_type: r.type, edge: "end" });
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </React.Fragment>
-                );
-              })}
-            </div>
-
-            {menu.open && (
-              <div
-                className="fixed z-50 bg-white border shadow-lg rounded-xl p-2 text-sm min-w-[220px]"
-                style={{ left: menu.x + 2, top: menu.y + 2 }}
-                onMouseLeave={()=>setMenu({ open:false, x:0, y:0, rowId:null })}
-              >
-                <div className="px-2 py-1 text-xs text-neutral-500">Set category</div>
-                {categories.map((c)=> (
-                  <button
-                    key={c.id}
-                    onClick={()=>{
-                      const targetRowId = menu.rowId;
-                      setRows((rs)=>rs.map((r)=>r.id===targetRowId?{...r, category:c.id}:r));
-                      setMenu({ open:false, x:0, y:0, rowId:null });
-                      trackEvent("activity_change_category", { row_id: targetRowId, category_id: c.id });
-                    }}
-                    className="w-full flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-neutral-100"
-                  >
-                    <span className="inline-block w-3 h-3 rounded-full" style={{ background:c.color }} /> {c.name}
-                  </button>
-                ))}
-                <div className="h-px my-1 bg-neutral-200" />
-                <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left" onClick={()=>{ onAddRowAt(rows.findIndex(r=>r.id===menu.rowId)+1); setMenu({ open:false, x:0, y:0, rowId:null }); }}>Add activity below</button>
-                <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left" onClick={()=>{ onAddMilestoneAt(rows.findIndex(r=>r.id===menu.rowId)+1); setMenu({ open:false, x:0, y:0, rowId:null }); }}>Add milestone below</button>
-                <button className="w-full px-2 py-1 rounded-lg hover:bg-neutral-100 text-left text-red-600" onClick={()=>{ onRemoveRow(menu.rowId); setMenu({ open:false, x:0, y:0, rowId:null }); }}>Delete activity</button>
-              </div>
-            )}
-          </div>
-        );
-      }
-
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(<TimelineBuilder />);
-    </script>
-  </body>
 </html>
