@@ -1079,10 +1079,7 @@
                   key={r.id}
                   className={`grid relative transition-colors ${dragOverIndex === idx ? "border-t-2 border-[#073a4b]" : ""}`}
                   style={{ gridTemplateColumns: gridTemplate, opacity: dragItemRef.current === idx ? 0.5 : 1 }}
-                  draggable
-                  onDragStart={(e) => handleRowDragStart(e, idx)}
                   onDragEnter={(e) => handleRowDragEnter(e, idx)}
-                  onDragEnd={handleRowDragEnd}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => handleRowDrop(e, idx)}
                 >
@@ -1093,7 +1090,13 @@
                       if (confirm('Delete this activity?')) onRemoveRow(r.id);
                     }}
                   >
-                    <div className="cursor-grab active:cursor-grabbing p-1 text-neutral-400 hover:text-neutral-600 mr-1" onMouseDown={e => e.stopPropagation()}>
+                    <div
+                      draggable
+                      onDragStart={(e) => handleRowDragStart(e, idx)}
+                      onDragEnd={handleRowDragEnd}
+                      className="cursor-grab active:cursor-grabbing p-1 text-neutral-400 hover:text-neutral-600 mr-1"
+                      onMouseDown={e => e.stopPropagation()}
+                    >
                       <GripVertical className="w-4 h-4" />
                     </div>
                     <span className="flex-1 truncate" contentEditable suppressContentEditableWarning onBlur={(e) => {
