@@ -18,11 +18,77 @@
 
 <body class="min-h-screen bg-neutral-50">
   <div id="root"></div>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script type="text/babel" data-type="module" data-presets="react">
-    import React, { useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18";
-    import ReactDOM from "https://esm.sh/react-dom@18/client";
-    import { Plus, Trash2, Upload, ChevronDown, ChevronUp, GripVertical } from "https://esm.sh/lucide-react@0.276.0";
+  <script type="text/babel" data-presets="react">
+    const { useEffect, useMemo, useRef, useState } = React;
+
+    const IconBase = ({ children, size = 16, className = "", ...props }) => (
+      <svg
+        viewBox="0 0 24 24"
+        width={size}
+        height={size}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        aria-hidden="true"
+        {...props}
+      >
+        {children}
+      </svg>
+    );
+
+    const Plus = (props) => (
+      <IconBase {...props}>
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </IconBase>
+    );
+
+    const Trash2 = (props) => (
+      <IconBase {...props}>
+        <path d="M3 6h18" />
+        <path d="M8 6V4h8v2" />
+        <path d="M10 11v6" />
+        <path d="M14 11v6" />
+        <path d="M5 6l1 14h12l1-14" />
+      </IconBase>
+    );
+
+    const Upload = (props) => (
+      <IconBase {...props}>
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="17 8 12 3 7 8" />
+        <line x1="12" y1="3" x2="12" y2="15" />
+      </IconBase>
+    );
+
+    const ChevronDown = (props) => (
+      <IconBase {...props}>
+        <polyline points="6 9 12 15 18 9" />
+      </IconBase>
+    );
+
+    const ChevronUp = (props) => (
+      <IconBase {...props}>
+        <polyline points="18 15 12 9 6 15" />
+      </IconBase>
+    );
+
+    const GripVertical = (props) => (
+      <IconBase {...props}>
+        <circle cx="9" cy="5" r="1" />
+        <circle cx="9" cy="12" r="1" />
+        <circle cx="9" cy="19" r="1" />
+        <circle cx="15" cy="5" r="1" />
+        <circle cx="15" cy="12" r="1" />
+        <circle cx="15" cy="19" r="1" />
+      </IconBase>
+    );
 
     const DEFAULT_EVENT_CATEGORY = "app_interaction";
 
